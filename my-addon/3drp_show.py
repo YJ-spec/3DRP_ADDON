@@ -124,17 +124,44 @@ def ha_read(entity_id, field="state"):
     return None
 
 def _parse_suffixes_from_request():
-    # 支援 ?suffix=a&suffix=b 以及 ?suffix=a,b
+    """支援 ?suffix=a&suffix=b 與 ?suffix=a,b 兩種寫法；沒帶就用 DEFAULT_SUFFIX（亦可逗號）"""
     suffix_params = request.args.getlist("suffix")
     suffixes = []
     if suffix_params:
         for s in suffix_params:
             suffixes.extend([x.strip() for x in s.split(",") if x.strip()])
     else:
-        # 用預設（允許 DEFAULT_SUFFIX 放逗號清單）
         suffixes = [x.strip() for x in (DEFAULT_SUFFIX or "").split(",") if x.strip()]
     return suffixes
 
+def _match_suffix(entity_id: str, suffixes: list[str]):
+    """
+    從 entity_id 尾端判斷命中的 suffix。
+    回傳 (matched_suffix, trailing)：
+      matched_suffix = 例如 'cttm_usedwatercontrol'
+      trailing       = 真正要從尾端裁掉的字串（可能是 '_'+suffix 或 suffix）
+    無命中回 (None, None)
+    """
+    if not suffixes:
+        return None, None
+    for s in suffixes:
+        if not s:
+            continue
+        if entity_id.endswith("_" + s):
+            return s, "_" + s
+        if entity_id.endswith(s):
+            return s, s
+    return None, None
+
+def _device_label_from_base(base: str) -> str:
+    """
+    base: '3drp_211242142' -> '3DRP_211242142'
+    其它前綴不處理大小寫。
+    """
+    if base.startswith("3drp"):
+        return "3DRP" + base[len("3drp"):]
+    return base
+    
 def _eid_matches_suffixes(eid: str, suffixes: list[str]) -> bool:
     if not suffixes:
         return True
@@ -208,53 +235,59 @@ def health():
 @app.get("/devices")
 def devices_view():
     """
-    聚合同裝置輸出（方案B：value + last_updated）。
+    聚合同裝置輸出（方案B：只回 value + last_updated，無 unit）
     Query:
-      - query: 關鍵字（比對 entity_id / friendly_name）
-      - prefix: entity_id 開頭（例 sensor.3drp_）
-      - suffix: 可多個（重複帶或逗號分隔），例：state,cttm_usedwatercontrol,lid_state
-      - limit: 限制輸出的裝置台數（預設 DEFAULT_LIMIT）
+      - query   : 關鍵字（比對 entity_id / friendly_name）
+      - prefix  : entity_id 開頭（例 sensor.3drp_）
+      - suffix  : 可多個（重複帶或逗號分隔），例：state,cttm_usedwatercontrol,lid_state
+      - limit   : 限制輸出的『裝置台數』（預設 DEFAULT_LIMIT）
     """
-    query  = request.args.get("query", DEFAULT_QUERY).strip()
-    prefix = request.args.get("prefix", DEFAULT_PREFIX).strip()
-    limit  = int(request.args.get("limit", DEFAULT_LIMIT))
+    query   = request.args.get("query", DEFAULT_QUERY).strip()
+    prefix  = request.args.get("prefix", DEFAULT_PREFIX).strip()
+    limit   = int(request.args.get("limit", DEFAULT_LIMIT))
     suffixes = _parse_suffixes_from_request()
 
     try:
-        # 一次取回全部 states，自行過濾（避免多次 HTTP round trips）
         states = _get_all_states()
+        devices_map = {}  # device_id -> {"device_id":..., "metrics": {...}}
 
-        devices_map: dict[str, dict] = {}
         for s in states:
             eid = s.get("entity_id") or ""
             if prefix and not eid.startswith(prefix):
                 continue
-            # 關鍵字（eid 或 friendly_name）
+
+            # 關鍵字（entity_id 或 friendly_name）
             if query:
                 name = (s.get("attributes", {}).get("friendly_name") or "")
-                if (query.lower() not in eid.lower()) and (query.lower() not in name.lower()):
+                q = query.lower()
+                if q not in eid.lower() and q not in name.lower():
                     continue
-            # 後綴比對
-            if not _eid_matches_suffixes(eid, suffixes):
+
+            # 後綴比對（拿到命中的 suffix 與實際要裁掉的 trailing）
+            matched_suffix, trailing = _match_suffix(eid, suffixes)
+            if not matched_suffix:
                 continue
 
-            # 解析 device 與 metric 名稱
+            # 去掉 domain 取得 object_id（sensor.3drp_211242142_state -> 3drp_211242142_state）
             base = eid.split(".", 1)[1] if "." in eid else eid
-            metric = base.rsplit("_", 1)[-1] if "_" in base else base
-            device_label = _device_label_from_entity_id(eid)
 
-            # 建立裝置項
-            if device_label not in devices_map:
-                devices_map[device_label] = {"device_id": device_label, "metrics": {}}
+            # 精準裁掉尾巴（依 trailing 長度），再把可能殘留的底線收乾淨
+            base_wo_suffix = base[: -len(trailing)] if trailing else base
+            base_wo_suffix = base_wo_suffix.rstrip("_")
 
-            devices_map[device_label]["metrics"][metric] = {
+            # 正常化裝置標籤
+            device_label = _device_label_from_base(base_wo_suffix)
+
+            # 收集 metrics（key 就是完整 suffix：matched_suffix）
+            row = devices_map.setdefault(device_label, {"device_id": device_label, "metrics": {}})
+            row["metrics"][matched_suffix] = {
                 "value": s.get("state"),
                 "last_updated": s.get("last_updated"),
             }
 
-        # 轉成 list，限制台數
+        # 輸出整理
         devices_list = list(devices_map.values())
-        devices_list.sort(key=lambda d: d["device_id"])  # 可換成依最新更新排序
+        devices_list.sort(key=lambda d: d["device_id"])
         if limit and len(devices_list) > limit:
             devices_list = devices_list[:limit]
 
@@ -267,6 +300,7 @@ def devices_view():
             "devices": devices_list
         }
         return jsonify(payload)
+
     except requests.HTTPError as e:
         return jsonify({"error": f"HTTP {e.response.status_code}", "detail": e.response.text[:300]}), 502
     except Exception as e:
