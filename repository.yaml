@@ -1,0 +1,6 @@
+name: CurieJet MQTT Integration
+url: https://github.com/YJ-spec/3DRP_ADDON
+maintainer: YJ-spec <your@email.com>
+description: >
+  This custom add-on provides MQTT Discovery integration for CurieJet devices
+  in Home Assistant, such as 3DRP and others.
