@@ -64,14 +64,30 @@ def _startswith_prefix(entity, prefix):
 def _endswith_suffix(entity, suffix):
     return not suffix or (entity.get("entity_id", "").endswith(suffix))
 
-def ha_search_entities(query=None, prefix=None, suffix=None, limit=DEFAULT_LIMIT):
-    """取得清單（依關鍵字/前綴/後綴篩選）。"""
+def _endswith_any(entity, suffixes):
+    """suffixes 為 list；任一符合即通過。空 list 視為不過濾。"""
+    if not suffixes:
+        return True
+    eid = entity.get("entity_id", "")
+    return any(eid.endswith(s) for s in suffixes if s)
+
+
+def ha_search_entities(query: str=None, prefix: str=None, suffix=None, limit: int=500):
+    # suffix 可能是 None / str / list
+    if suffix is None:
+        suffixes = []
+    elif isinstance(suffix, str):
+        suffixes = [s.strip() for s in suffix.split(",") if s.strip()]
+    else:
+        # 已是 list
+        suffixes = [s.strip() for s in suffix if s and s.strip()]
+
     states = _get_all_states()
     out = []
     for s in states:
         if not _startswith_prefix(s, prefix or ""):
             continue
-        if not _endswith_suffix(s, suffix or ""):
+        if not _endswith_any(s, suffixes):
             continue
         if not _match_keyword(s, (query or "").strip()):
             continue
@@ -86,6 +102,7 @@ def ha_search_entities(query=None, prefix=None, suffix=None, limit=DEFAULT_LIMIT
         if len(out) >= limit:
             break
     return out
+
 
 def ha_read(entity_id, field="state"):
     """讀取單一實體的指定欄位。"""
@@ -110,13 +127,22 @@ app = Flask(__name__)
 
 @app.get("/entities")
 def api_entities():
-    """取得清單（依關鍵字/前綴/後綴）"""
     query  = request.args.get("query", DEFAULT_QUERY).strip()
     prefix = request.args.get("prefix", DEFAULT_PREFIX).strip()
-    suffix = request.args.get("suffix", DEFAULT_SUFFIX).strip()
+
+    # 同時支援：?suffix=_p25&suffix=_p10&suffix=_p1 以及 ?suffix=_p25,_p10,_p1
+    suffix_params = request.args.getlist("suffix")
+    suffixes = []
+    if suffix_params:
+        for s in suffix_params:
+            suffixes.extend([x.strip() for x in s.split(",") if x.strip()])
+    else:
+        # 沒有帶就用預設（也可設成空字串表示不過濾）
+        suffixes = [x.strip() for x in (DEFAULT_SUFFIX or "").split(",") if x.strip()]
+
     limit  = int(request.args.get("limit", DEFAULT_LIMIT))
     try:
-        items = ha_search_entities(query=query, prefix=prefix, suffix=suffix, limit=limit)
+        items = ha_search_entities(query=query, prefix=prefix, suffix=suffixes, limit=limit)
         return jsonify({"count": len(items), "items": items})
     except requests.HTTPError as e:
         return jsonify({"error": f"HTTP {e.response.status_code}", "detail": e.response.text[:300]}), 502
