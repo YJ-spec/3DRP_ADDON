@@ -1,5 +1,5 @@
-﻿name: "curiejet integration"
-version: "2.0.2"
+﻿name: "curiejet 3DRP integration"
+version: "1.0.0"
 slug: "curiejet_integration"
 description: "This Home Assistant add-on listens to MQTT messages and dynamically generates 
   MQTT Discovery configurations for CurieJet devices (e.g., 3DRP). 
