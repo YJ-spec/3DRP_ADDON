@@ -5,6 +5,12 @@ import requests
 import os
 from flask import Flask, request, jsonify
 
+# ---------------- 可自訂的查詢預設值 ----------------
+DEFAULT_QUERY  = ""             # 關鍵字
+DEFAULT_PREFIX = "sensor.zp2_"  # entity_id 開頭條件
+DEFAULT_SUFFIX = "_p25"         # entity_id 結尾條件
+DEFAULT_LIMIT  = 500            # 最多回傳幾筆
+
 # ---------------- 你的原始參數（沿用） ----------------
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
@@ -16,7 +22,7 @@ MQTT_BROKER = options.get("mqtt_broker", "core-mosquitto")
 MQTT_PORT = int(options.get("mqtt_port", 1883))
 MQTT_USERNAME = options.get("mqtt_username", "")
 MQTT_PASSWORD = options.get("mqtt_password", "")
-LONG_TOKEN = options.get("HA_LONG_LIVED_TOKEN", "")  # ← 沿用你的命名
+LONG_TOKEN = options.get("HA_LONG_LIVED_TOKEN", "")
 
 HEADERS = {
     "Authorization": f"Bearer {LONG_TOKEN}",
@@ -25,14 +31,14 @@ HEADERS = {
 
 BASE_URL = options.get("ha_base_url", "http://homeassistant:8123/api").rstrip("/")
 
-# 伺服器設定（可放 options.json 或給預設）
+# HTTP 伺服器設定
 HTTP_HOST = options.get("http_host", "0.0.0.0")
 HTTP_PORT = int(options.get("http_port", 8099))
 LOG_LEVEL  = options.get("log_level", "INFO").upper()
 logging.getLogger().setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
 
 if not LONG_TOKEN:
-    logging.warning("HA Long-Lived Token 未設定（/data/options.json 的 HA_LONG_LIVED_TOKEN）。")
+    logging.warning("⚠️ HA Long-Lived Token 未設定（/data/options.json 的 HA_LONG_LIVED_TOKEN）。")
 
 # ---------------- 核心：查清單 / 讀欄位 ----------------
 def _get_all_states():
@@ -42,10 +48,9 @@ def _get_all_states():
     url = f"{BASE_URL}/states"
     resp = requests.get(url, headers=HEADERS, timeout=5)
     resp.raise_for_status()
-    return resp.json()  # list[dict]
+    return resp.json()
 
-def _match_keyword(entity: dict, kw: str) -> bool:
-    """在 entity_id 與 friendly_name 做不分大小寫包含搜尋。"""
+def _match_keyword(entity, kw):
     if not kw:
         return True
     kw = kw.lower()
@@ -53,27 +58,14 @@ def _match_keyword(entity: dict, kw: str) -> bool:
     name = (entity.get("attributes", {}).get("friendly_name") or "").lower()
     return (kw in eid) or (kw in name)
 
-def _startswith_prefix(entity: dict, prefix: str) -> bool:
-    if not prefix:
-        return True
-    eid = (entity.get("entity_id") or "")
-    return eid.startswith(prefix)
+def _startswith_prefix(entity, prefix):
+    return not prefix or (entity.get("entity_id", "").startswith(prefix))
 
-def _endswith_suffix(entity: dict, suffix: str) -> bool:
-    if not suffix:
-        return True
-    eid = (entity.get("entity_id") or "")
-    return eid.endswith(suffix)
+def _endswith_suffix(entity, suffix):
+    return not suffix or (entity.get("entity_id", "").endswith(suffix))
 
-def ha_search_entities(query: str=None, prefix: str=None, suffix: str=None, limit: int=500):
-    """
-    取得清單（依關鍵字/前綴/後綴篩選）。
-    - query: 關鍵字（不分大小寫，比對 entity_id / friendly_name）
-    - prefix: entity_id 必須以此字串開頭（例 'sensor.zp2_'）
-    - suffix: entity_id 必須以此字串結尾（例 '_p25'）
-    - limit: 最大筆數
-    回傳：list[dict]
-    """
+def ha_search_entities(query=None, prefix=None, suffix=None, limit=DEFAULT_LIMIT):
+    """取得清單（依關鍵字/前綴/後綴篩選）。"""
     states = _get_all_states()
     out = []
     for s in states:
@@ -95,27 +87,14 @@ def ha_search_entities(query: str=None, prefix: str=None, suffix: str=None, limi
             break
     return out
 
-def ha_read(entity_id: str, field: str="state"):
-    """
-    讀取單一實體指定欄位。
-    field 支援：
-      - "state"（預設）
-      - "attributes.<key>"（例：attributes.unit_of_measurement）
-      - "attr:<key>" 簡寫（例：attr:device_class）
-    回傳：欄位值（找不到時回 None）；404 時丟出 LookupError。
-    """
-    if not entity_id:
-        raise ValueError("entity_id 不可為空")
-    if not HEADERS.get("Authorization"):
-        raise RuntimeError("HA Token 未設定（HEADERS 無 Authorization）")
-
+def ha_read(entity_id, field="state"):
+    """讀取單一實體的指定欄位。"""
     url = f"{BASE_URL}/states/{entity_id}"
     resp = requests.get(url, headers=HEADERS, timeout=5)
     if resp.status_code == 404:
         raise LookupError(f"Entity 不存在：{entity_id}")
     resp.raise_for_status()
     ent = resp.json()
-
     if field in (None, "", "state"):
         return ent.get("state")
     if field.startswith("attributes."):
@@ -126,23 +105,16 @@ def ha_read(entity_id: str, field: str="state"):
         return ent.get("attributes", {}).get(key)
     return None
 
-# ---------------- 輕量 Flask API ----------------
+# ---------------- Flask API ----------------
 app = Flask(__name__)
 
 @app.get("/entities")
 def api_entities():
-    """
-    取得清單（依關鍵字/前綴/後綴）
-    Query:
-      - query: 關鍵字（不分大小寫，比對 entity_id / friendly_name）
-      - prefix: 需符合 entity_id 開頭（例 sensor.zp2_）
-      - suffix: 需符合 entity_id 結尾（例 _p25）
-      - limit: 最多回傳幾筆（預設 500）
-    """
-    query  = request.args.get("query", "").strip()
-    prefix = request.args.get("prefix", "").strip()
-    suffix = request.args.get("suffix", "").strip()
-    limit  = int(request.args.get("limit", 500))
+    """取得清單（依關鍵字/前綴/後綴）"""
+    query  = request.args.get("query", DEFAULT_QUERY).strip()
+    prefix = request.args.get("prefix", DEFAULT_PREFIX).strip()
+    suffix = request.args.get("suffix", DEFAULT_SUFFIX).strip()
+    limit  = int(request.args.get("limit", DEFAULT_LIMIT))
     try:
         items = ha_search_entities(query=query, prefix=prefix, suffix=suffix, limit=limit)
         return jsonify({"count": len(items), "items": items})
@@ -153,12 +125,7 @@ def api_entities():
 
 @app.get("/read")
 def api_read():
-    """
-    讀取單一實體的指定欄位
-    Query:
-      - entity_id: 必填（例 sensor.zp2_xx_xx_p25）
-      - field: 預設 state；或 attributes.xxx / attr:xxx
-    """
+    """讀取單一實體的指定欄位"""
     eid = request.args.get("entity_id", "").strip()
     field = (request.args.get("field", "state") or "state").strip()
     if not eid:
@@ -180,4 +147,5 @@ def health():
 if __name__ == "__main__":
     logging.info(f"HA base: {BASE_URL}")
     logging.info(f"HTTP listening on {HTTP_HOST}:{HTTP_PORT}")
+    logging.info(f"Default filters → query='{DEFAULT_QUERY}', prefix='{DEFAULT_PREFIX}', suffix='{DEFAULT_SUFFIX}'")
     app.run(host=HTTP_HOST, port=HTTP_PORT, debug=False, threaded=True)
