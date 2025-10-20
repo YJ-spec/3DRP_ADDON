@@ -5,6 +5,7 @@ import requests
 import os
 from datetime import datetime, timezone
 from flask import Flask, request, jsonify
+from flask import Response  # 放在檔案開頭的 import 區域（已有就略過）
 
 # ---------------- 可自訂的查詢預設值 ----------------
 DEFAULT_QUERY  = ""             # 關鍵字
@@ -51,78 +52,6 @@ def _get_all_states():
     resp.raise_for_status()
     return resp.json()
 
-def _match_keyword(entity, kw):
-    if not kw:
-        return True
-    kw = kw.lower()
-    eid = (entity.get("entity_id") or "").lower()
-    name = (entity.get("attributes", {}).get("friendly_name") or "").lower()
-    return (kw in eid) or (kw in name)
-
-def _startswith_prefix(entity, prefix):
-    return not prefix or (entity.get("entity_id", "").startswith(prefix))
-
-def _endswith_suffix(entity, suffix):
-    return not suffix or (entity.get("entity_id", "").endswith(suffix))
-
-def _endswith_any(entity, suffixes):
-    """suffixes 為 list；任一符合即通過。空 list 視為不過濾。"""
-    if not suffixes:
-        return True
-    eid = entity.get("entity_id", "")
-    return any(eid.endswith(s) for s in suffixes if s)
-
-
-def ha_search_entities(query: str=None, prefix: str=None, suffix=None, limit: int=500):
-    # suffix 可能是 None / str / list
-    if suffix is None:
-        suffixes = []
-    elif isinstance(suffix, str):
-        suffixes = [s.strip() for s in suffix.split(",") if s.strip()]
-    else:
-        # 已是 list
-        suffixes = [s.strip() for s in suffix if s and s.strip()]
-
-    states = _get_all_states()
-    out = []
-    for s in states:
-        if not _startswith_prefix(s, prefix or ""):
-            continue
-        if not _endswith_any(s, suffixes):
-            continue
-        if not _match_keyword(s, (query or "").strip()):
-            continue
-        out.append({
-            "entity_id": s.get("entity_id"),
-            "state": s.get("state"),
-            "friendly_name": s.get("attributes", {}).get("friendly_name"),
-            "unit": s.get("attributes", {}).get("unit_of_measurement"),
-            "last_changed": s.get("last_changed"),
-            "last_updated": s.get("last_updated"),
-        })
-        if len(out) >= limit:
-            break
-    return out
-
-
-def ha_read(entity_id, field="state"):
-    """讀取單一實體的指定欄位。"""
-    url = f"{BASE_URL}/states/{entity_id}"
-    resp = requests.get(url, headers=HEADERS, timeout=5)
-    if resp.status_code == 404:
-        raise LookupError(f"Entity 不存在：{entity_id}")
-    resp.raise_for_status()
-    ent = resp.json()
-    if field in (None, "", "state"):
-        return ent.get("state")
-    if field.startswith("attributes."):
-        key = field.split(".", 1)[1]
-        return ent.get("attributes", {}).get(key)
-    if field.startswith("attr:"):
-        key = field.split(":", 1)[1]
-        return ent.get("attributes", {}).get(key)
-    return None
-
 def _parse_suffixes_from_request():
     """支援 ?suffix=a&suffix=b 與 ?suffix=a,b 兩種寫法；沒帶就用 DEFAULT_SUFFIX（亦可逗號）"""
     suffix_params = request.args.getlist("suffix")
@@ -161,72 +90,168 @@ def _device_label_from_base(base: str) -> str:
     if base.startswith("3drp"):
         return "3DRP" + base[len("3drp"):]
     return base
-    
-def _eid_matches_suffixes(eid: str, suffixes: list[str]) -> bool:
-    if not suffixes:
-        return True
-    for s in suffixes:
-        if not s:
-            continue
-        # 允許帶或不帶底線的寫法
-        if eid.endswith(s) or eid.endswith("_" + s):
-            return True
-    return False
 
-def _device_label_from_entity_id(eid: str) -> str:
-    # sensor.3drp_211242142_state -> 3drp_211242142
-    base = eid.split(".", 1)[1] if "." in eid else eid
-    if "_" in base:
-        device_part = base.rsplit("_", 1)[0]
-    else:
-        device_part = base
-    # 正常化：3drp -> 3DRP，其它維持原樣
-    if device_part.startswith("3drp"):
-        return "3DRP" + device_part[len("3drp"):]
-    return device_part
 # ---------------- Flask API ----------------
 app = Flask(__name__)
 
-@app.get("/entities")
-def api_entities():
-    query  = request.args.get("query", DEFAULT_QUERY).strip()
-    prefix = request.args.get("prefix", DEFAULT_PREFIX).strip()
+@app.get("/status")
+def status_page():
+    html = r"""
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>列印耗材狀態面板</title>
+  <style>
+    :root{
+      --bg:#0b0f14;--panel:#10161d;--panel2:#151c24;--text:#e6eef8;--muted:#9fb3c8;
+      --accent:#3ea6ff;--ok:#4ade80;--danger:#ef4444;--border:#223246;
+      --shadow:0 10px 24px rgba(0,0,0,.35);
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Noto Sans,"Helvetica Neue",Arial;
+      background:
+        radial-gradient(1200px 600px at 100% -20%, #12202d, transparent),
+        radial-gradient(800px 500px at -20% 120%, #1a2a38, transparent),
+        var(--bg);
+      color:var(--text);
+    }
+    .container{max-width:1100px;margin:28px auto;padding:0 16px}
+    .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow)}
+    .header{padding:18px 18px 0}
+    h1{margin:0;font-size:22px}
+    .sub{color:var(--muted);font-size:13px;margin-top:6px}
+    .controls{display:flex;gap:10px;align-items:center;padding:14px 18px 18px;flex-wrap:wrap}
+    .pill{border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-size:12px;color:var(--muted)}
+    .btn{border:1px solid #2b4256;background:linear-gradient(180deg,#15324a,#10273a);color:#d9f1ff;border-radius:10px;padding:8px 12px;cursor:pointer}
+    .btn:active{transform:translateY(1px)}
+    .table-wrap{border-top:1px solid var(--border)}
+    .scroller{max-height:68vh;overflow:auto}
+    table{width:100%;border-collapse:separate;border-spacing:0}
+    thead th{
+      position:sticky;top:0;background:#0f151c;z-index:1;text-align:left;
+      font-size:13px;color:#c7d7ea;padding:10px 12px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);white-space:nowrap
+    }
+    thead th:last-child{border-right:0}
+    tbody td{padding:10px 12px;font-size:13px;color:#e6eef8;border-bottom:1px solid #17212c;border-right:1px solid #17212c}
+    tbody td:last-child{border-right:0}
+    tbody tr:hover td{background:#0f1922}
+    .statusbar{display:flex;justify-content:space-between;gap:12px;padding:12px 16px;color:var(--muted);border-top:1px solid var(--border);background:#0c1218;font-size:12px;border-radius:0 0 16px 16px}
+    .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+    .err{color:#ffd1d1}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <div class="header">
+        <h1>列印耗材狀態</h1>
+        <div class="sub">資料來源：/devices?prefix=sensor.print_&suffix=_a,_c,_m,_y,_k,_z2（每 60 秒自動刷新）</div>
+      </div>
+      <div class="controls">
+        <span class="pill">欄位順序：_a → _c → _m → _y → _k → _z2</span>
+        <button id="btnRefresh" class="btn">立即刷新</button>
+      </div>
+      <div class="table-wrap">
+        <div class="scroller">
+          <table id="t">
+            <thead>
+              <tr id="thead"></tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="statusbar">
+        <div>
+          <span>筆數：<span id="count">0</span></span>
+          <span style="margin-left:12px">最後更新：<span id="updated">—</span></span>
+        </div>
+        <div class="mono err" id="msg"></div>
+      </div>
+    </div>
+  </div>
 
-    # 同時支援：?suffix=_p25&suffix=_p10&suffix=_p1 以及 ?suffix=_p25,_p10,_p1
-    suffix_params = request.args.getlist("suffix")
-    suffixes = []
-    if suffix_params:
-        for s in suffix_params:
-            suffixes.extend([x.strip() for x in s.split(",") if x.strip()])
-    else:
-        # 沒有帶就用預設（也可設成空字串表示不過濾）
-        suffixes = [x.strip() for x in (DEFAULT_SUFFIX or "").split(",") if x.strip()]
+  <script>
+    const SUFFIX_ORDER = ["_a","_c","_m","_y","_k","_z2"]; // 固定欄位順序
+    const DEVICES_URL = "/devices?prefix=sensor.print_&suffix=_a,_c,_m,_y,_k,_z2";
+    const REFRESH_MS = 60000; // 每分鐘刷新
 
-    limit  = int(request.args.get("limit", DEFAULT_LIMIT))
-    try:
-        items = ha_search_entities(query=query, prefix=prefix, suffix=suffixes, limit=limit)
-        return jsonify({"count": len(items), "items": items})
-    except requests.HTTPError as e:
-        return jsonify({"error": f"HTTP {e.response.status_code}", "detail": e.response.text[:300]}), 502
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    const elHead = document.getElementById('thead');
+    const elBody = document.getElementById('tbody');
+    const elCount = document.getElementById('count');
+    const elUpdated = document.getElementById('updated');
+    const elMsg = document.getElementById('msg');
+    const elBtn = document.getElementById('btnRefresh');
 
-@app.get("/read")
-def api_read():
-    """讀取單一實體的指定欄位"""
-    eid = request.args.get("entity_id", "").strip()
-    field = (request.args.get("field", "state") or "state").strip()
-    if not eid:
-        return jsonify({"error": "missing entity_id"}), 400
-    try:
-        value = ha_read(eid, field=field)
-        return jsonify({"entity_id": eid, "field": field, "value": value})
-    except LookupError as e:
-        return jsonify({"error": str(e)}), 404
-    except requests.HTTPError as e:
-        return jsonify({"error": f"HTTP {e.response.status_code}", "detail": e.response.text[:300]}), 502
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
+    // 產表頭
+    function renderHead() {
+      const cols = ["裝置", ...SUFFIX_ORDER];
+      elHead.innerHTML = cols.map(c => `<th>${c}</th>`).join("");
+    }
+
+    function fmt(v) {
+      if (v === null || v === undefined) return "";
+      return String(v);
+    }
+
+    // 把 /devices 結果轉成列
+    function toRows(payload) {
+      const rows = [];
+      const devices = Array.isArray(payload?.devices) ? payload.devices : [];
+      for (const d of devices) {
+        const id = d?.device_id ?? "";
+        const m = d?.metrics ?? {};
+        const row = { device: id };
+        for (const sfx of SUFFIX_ORDER) {
+          row[sfx] = m[sfx]?.value ?? ""; // 只取 value；沒有就空白
+        }
+        rows.push(row);
+      }
+      return rows;
+    }
+
+    function renderBody(rows) {
+      if (!rows.length) {
+        elBody.innerHTML = `<tr><td colspan="${1+SUFFIX_ORDER.length}" style="text-align:center;color:#9fb3c8;padding:18px">無資料</td></tr>`;
+        elCount.textContent = "0";
+        return;
+      }
+      const html = rows.map(r => {
+        const cells = [`<td>${fmt(r.device)}</td>`];
+        for (const sfx of SUFFIX_ORDER) cells.push(`<td>${fmt(r[sfx])}</td>`);
+        return `<tr>${cells.join("")}</tr>`;
+      }).join("");
+      elBody.innerHTML = html;
+      elCount.textContent = String(rows.length);
+    }
+
+    async function refresh() {
+      elMsg.textContent = "";
+      try {
+        const res = await fetch(DEVICES_URL, { headers: { "Accept": "application/json" } });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const json = await res.json();
+        renderBody(toRows(json));
+        elUpdated.textContent = new Date().toLocaleString();
+      } catch (err) {
+        elMsg.textContent = "讀取失敗：" + err.message;
+      }
+    }
+
+    // 初始化
+    renderHead();
+    refresh();
+    elBtn.addEventListener('click', refresh);
+    setInterval(refresh, REFRESH_MS);
+  </script>
+</body>
+</html>
+"""
+    return Response(html, mimetype="text/html; charset=utf-8")
 
 @app.get("/health")
 def health():
@@ -276,7 +301,8 @@ def devices_view():
             base_wo_suffix = base_wo_suffix.rstrip("_")
 
             # 正常化裝置標籤
-            device_label = _device_label_from_base(base_wo_suffix)
+            device_label = base_wo_suffix
+            # device_label = _device_label_from_base(base_wo_suffix)
 
             # 收集 metrics（key 就是完整 suffix：matched_suffix）
             row = devices_map.setdefault(device_label, {"device_id": device_label, "metrics": {}})
