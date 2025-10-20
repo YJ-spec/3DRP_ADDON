@@ -94,6 +94,8 @@ def _device_label_from_base(base: str) -> str:
 # ---------------- Flask API ----------------
 app = Flask(__name__)
 
+from flask import Response  # 檔頭區有就略過
+
 @app.get("/status")
 def status_page():
     html = r"""
@@ -119,11 +121,11 @@ def status_page():
         var(--bg);
       color:var(--text);
     }
-    .container{max-width:1100px;margin:28px auto;padding:0 16px}
+    .container{max-width:1200px;margin:28px auto;padding:0 16px}
     .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow)}
     .header{padding:18px 18px 0}
     h1{margin:0;font-size:22px}
-    .sub{color:var(--muted);font-size:13px;margin-top:6px}
+    .sub{color:var(--muted);font-size:13px;margin-top:6px;word-break:break-all}
     .controls{display:flex;gap:10px;align-items:center;padding:14px 18px 18px;flex-wrap:wrap}
     .pill{border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-size:12px;color:var(--muted)}
     .btn{border:1px solid #2b4256;background:linear-gradient(180deg,#15324a,#10273a);color:#d9f1ff;border-radius:10px;padding:8px 12px;cursor:pointer}
@@ -136,7 +138,7 @@ def status_page():
       font-size:13px;color:#c7d7ea;padding:10px 12px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);white-space:nowrap
     }
     thead th:last-child{border-right:0}
-    tbody td{padding:10px 12px;font-size:13px;color:#e6eef8;border-bottom:1px solid #17212c;border-right:1px solid #17212c}
+    tbody td{padding:10px 12px;font-size:13px;color:#e6eef8;border-bottom:1px solid #17212c;border-right:1px solid #17212c;white-space:nowrap}
     tbody td:last-child{border-right:0}
     tbody tr:hover td{background:#0f1922}
     .statusbar{display:flex;justify-content:space-between;gap:12px;padding:12px 16px;color:var(--muted);border-top:1px solid var(--border);background:#0c1218;font-size:12px;border-radius:0 0 16px 16px}
@@ -149,18 +151,20 @@ def status_page():
     <div class="card">
       <div class="header">
         <h1>列印耗材狀態</h1>
-        <div class="sub">資料來源：/devices?prefix=sensor.print_&suffix=_a,_c,_m,_y,_k,_z2（每 60 秒自動刷新）</div>
+        <div class="sub">
+          資料來源：
+          /devices?prefix=sensor.print_&suffix=_action,_fwversion,_c,_m,_y,_k,_p,_w,_a,_yk,_cm,_z1,_z2
+          （每 60 秒自動刷新）
+        </div>
       </div>
       <div class="controls">
-        <span class="pill">欄位順序：_a → _c → _m → _y → _k → _z2</span>
+        <span class="pill">欄位順序：_action → _fwversion → _c → _m → _y → _k → _p → _w → _a → _yk → _cm → _z1 → _z2</span>
         <button id="btnRefresh" class="btn">立即刷新</button>
       </div>
       <div class="table-wrap">
         <div class="scroller">
           <table id="t">
-            <thead>
-              <tr id="thead"></tr>
-            </thead>
+            <thead><tr id="thead"></tr></thead>
             <tbody id="tbody"></tbody>
           </table>
         </div>
@@ -176,8 +180,12 @@ def status_page():
   </div>
 
   <script>
-    const SUFFIX_ORDER = ["_a","_c","_m","_y","_k","_z2"]; // 固定欄位順序
-    const DEVICES_URL = "/devices?prefix=sensor.print_&suffix=_a,_c,_m,_y,_k,_z2";
+    // 1) 依你指定的順序固定欄位
+    const SUFFIX_ORDER = ["_action","_fwversion","_c","_m","_y","_k","_p","_w","_a","_yk","_cm","_z1","_z2"];
+
+    // 2) 呼叫 /devices 加上新的 suffix 查詢參數
+    const DEVICES_URL = "/devices?prefix=sensor.print_&suffix=_action,_fwversion,_c,_m,_y,_k,_p,_w,_a,_yk,_cm,_z1,_z2";
+
     const REFRESH_MS = 60000; // 每分鐘刷新
 
     const elHead = document.getElementById('thead');
@@ -187,7 +195,6 @@ def status_page():
     const elMsg = document.getElementById('msg');
     const elBtn = document.getElementById('btnRefresh');
 
-    // 產表頭
     function renderHead() {
       const cols = ["裝置", ...SUFFIX_ORDER];
       elHead.innerHTML = cols.map(c => `<th>${c}</th>`).join("");
@@ -198,7 +205,6 @@ def status_page():
       return String(v);
     }
 
-    // 把 /devices 結果轉成列
     function toRows(payload) {
       const rows = [];
       const devices = Array.isArray(payload?.devices) ? payload.devices : [];
@@ -207,7 +213,7 @@ def status_page():
         const m = d?.metrics ?? {};
         const row = { device: id };
         for (const sfx of SUFFIX_ORDER) {
-          row[sfx] = m[sfx]?.value ?? ""; // 只取 value；沒有就空白
+          row[sfx] = m[sfx]?.value ?? ""; // 只取 value
         }
         rows.push(row);
       }
@@ -242,7 +248,6 @@ def status_page():
       }
     }
 
-    // 初始化
     renderHead();
     refresh();
     elBtn.addEventListener('click', refresh);
