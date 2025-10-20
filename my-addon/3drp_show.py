@@ -94,8 +94,6 @@ def _device_label_from_base(base: str) -> str:
 # ---------------- Flask API ----------------
 app = Flask(__name__)
 
-from flask import Response  # 檔頭區有就略過
-
 @app.get("/status")
 def status_page():
     html = r"""
@@ -121,8 +119,19 @@ def status_page():
         var(--bg);
       color:var(--text);
     }
-    .container{max-width:1200px;margin:28px auto;padding:0 16px}
-    .card{background:linear-gradient(180deg,var(--panel),var(--panel2));border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow)}
+    /* ✅ 改成幾乎全螢幕寬度 */
+    .container{
+      max-width:95vw;
+      margin:20px auto;
+      padding:0 8px;
+    }
+    .card{
+      width:100%;
+      background:linear-gradient(180deg,var(--panel),var(--panel2));
+      border:1px solid var(--border);
+      border-radius:16px;
+      box-shadow:var(--shadow);
+    }
     .header{padding:18px 18px 0}
     h1{margin:0;font-size:22px}
     .sub{color:var(--muted);font-size:13px;margin-top:6px;word-break:break-all}
@@ -131,14 +140,26 @@ def status_page():
     .btn{border:1px solid #2b4256;background:linear-gradient(180deg,#15324a,#10273a);color:#d9f1ff;border-radius:10px;padding:8px 12px;cursor:pointer}
     .btn:active{transform:translateY(1px)}
     .table-wrap{border-top:1px solid var(--border)}
-    .scroller{max-height:68vh;overflow:auto}
-    table{width:100%;border-collapse:separate;border-spacing:0}
+    .scroller{max-height:70vh;overflow:auto}
+    /* ✅ 讓表格撐滿整個寬度並自動換行 */
+    table{
+      width:100%;
+      min-width:100%;
+      border-collapse:separate;
+      border-spacing:0;
+      table-layout:auto;
+    }
     thead th{
       position:sticky;top:0;background:#0f151c;z-index:1;text-align:left;
-      font-size:13px;color:#c7d7ea;padding:10px 12px;border-bottom:1px solid var(--border);border-right:1px solid var(--border);white-space:nowrap
+      font-size:13px;color:#c7d7ea;padding:10px 12px;
+      border-bottom:1px solid var(--border);border-right:1px solid var(--border);
     }
     thead th:last-child{border-right:0}
-    tbody td{padding:10px 12px;font-size:13px;color:#e6eef8;border-bottom:1px solid #17212c;border-right:1px solid #17212c;white-space:nowrap}
+    tbody td{
+      padding:10px 12px;font-size:13px;color:#e6eef8;
+      border-bottom:1px solid #17212c;border-right:1px solid #17212c;
+      white-space:normal;word-break:break-all; /* ✅ 可換行 */
+    }
     tbody td:last-child{border-right:0}
     tbody tr:hover td{background:#0f1922}
     .statusbar{display:flex;justify-content:space-between;gap:12px;padding:12px 16px;color:var(--muted);border-top:1px solid var(--border);background:#0c1218;font-size:12px;border-radius:0 0 16px 16px}
@@ -180,12 +201,8 @@ def status_page():
   </div>
 
   <script>
-    // 1) 依你指定的順序固定欄位
     const SUFFIX_ORDER = ["_action","_fwversion","_c","_m","_y","_k","_p","_w","_a","_yk","_cm","_z1","_z2"];
-
-    // 2) 呼叫 /devices 加上新的 suffix 查詢參數
     const DEVICES_URL = "/devices?prefix=sensor.print_&suffix=_action,_fwversion,_c,_m,_y,_k,_p,_w,_a,_yk,_cm,_z1,_z2";
-
     const REFRESH_MS = 60000; // 每分鐘刷新
 
     const elHead = document.getElementById('thead');
@@ -213,7 +230,7 @@ def status_page():
         const m = d?.metrics ?? {};
         const row = { device: id };
         for (const sfx of SUFFIX_ORDER) {
-          row[sfx] = m[sfx]?.value ?? ""; // 只取 value
+          row[sfx] = m[sfx]?.value ?? "";
         }
         rows.push(row);
       }
