@@ -275,7 +275,6 @@ def status_page():
 """
     return Response(html, mimetype="text/html; charset=utf-8")
 
-
 @app.get("/status2")
 def status2_page():
     html = r"""
@@ -284,7 +283,7 @@ def status2_page():
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>列印狀態面板 (v2)</title>
+  <title>列印狀態面板 (可橫向捲動)</title>
   <style>
     :root{
       --bg:#0b0f14;--panel:#10161d;--panel2:#151c24;--text:#e6eef8;--muted:#9fb3c8;
@@ -315,11 +314,23 @@ def status2_page():
     .controls{display:flex;gap:10px;align-items:center;padding:14px 18px 18px;flex-wrap:wrap}
     .pill{border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-size:12px;color:var(--muted)}
     .btn{border:1px solid #2b4256;background:linear-gradient(180deg,#15324a,#10273a);color:#d9f1ff;border-radius:10px;padding:8px 12px;cursor:pointer}
-    .btn.sm{padding:6px 10px;font-size:12px;border-radius:8px}
     .btn:active{transform:translateY(1px)}
     .table-wrap{border-top:1px solid var(--border);position:relative}
-    .scroller{max-height:70vh;overflow:auto;-webkit-overflow-scrolling:touch;overflow-x:auto;}
-    table{width:100%;border-collapse:separate;border-spacing:0;table-layout:auto;min-width:100%;}
+    /* ✅ 開啟水平滾動 */
+    .scroller{
+      max-height:70vh;
+      overflow:auto;
+      overflow-x:auto;
+      -webkit-overflow-scrolling:touch;
+      overscroll-behavior:contain;
+    }
+    table{
+      width:max(1200px,100%);
+      border-collapse:separate;
+      border-spacing:0;
+      table-layout:auto;
+      min-width:100%;
+    }
     thead th{
       position:sticky;top:0;background:#0f151c;z-index:2;text-align:left;
       font-size:13px;color:#c7d7ea;padding:10px 12px;
@@ -328,46 +339,33 @@ def status2_page():
     }
     thead th:first-child,tbody td:first-child{
       position:sticky;left:0;z-index:3;background:linear-gradient(180deg,var(--panel),var(--panel2));
-      border-right:1px solid var(--border);min-width:200px;
+      border-right:1px solid var(--border);
+      min-width:200px;
     }
-    tbody td{padding:10px 12px;font-size:13px;color:#e6eef8;border-bottom:1px solid #17212c;border-right:1px solid #17212c;white-space:nowrap;}
+    tbody td{
+      padding:10px 12px;font-size:13px;color:#e6eef8;
+      border-bottom:1px solid #17212c;border-right:1px solid #17212c;
+      white-space:nowrap;
+    }
     tbody tr:hover td{background:#0f1922}
     .statusbar{display:flex;justify-content:space-between;gap:12px;padding:12px 16px;color:var(--muted);border-top:1px solid var(--border);background:#0c1218;font-size:12px;border-radius:0 0 16px 16px}
     .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
     .err{color:#ffd1d1}
-
-    /* 欄位選擇面板 */
-    .col-panel{
-      position: fixed; inset: 0; background: rgba(0,0,0,.5);
-      display: grid; place-items: center; z-index: 50;
-    }
-    .col-panel-inner{
-      width: min(720px, 92vw); max-height: 80vh; overflow: auto;
-      background: linear-gradient(180deg,var(--panel),var(--panel2));
-      border:1px solid var(--border); border-radius:16px; box-shadow: var(--shadow);
-      padding: 14px;
-    }
-    .col-hdr{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px }
-    .col-actions{ display:flex; gap:8px; flex-wrap:wrap }
-    .col-list{ border:1px solid var(--border); border-radius:10px; overflow:auto; max-height:52vh }
-    .col-row{
-      display:grid; grid-template-columns: 36px 1fr; gap:8px; align-items:center; padding:8px 10px;
-      border-bottom:1px solid #17212c; cursor:pointer;
-    }
-    .col-row:hover{ background:#0f1922 }
-    .col-row.active{ outline:2px solid var(--accent) }
-    .col-name{ color:#e6eef8; font-size:13px }
   </style>
 </head>
 <body>
   <div class="container">
     <div class="card">
       <div class="header">
-        <h1>列印狀態 (可自訂欄位)</h1>
-        <div class="sub">資料來源：/devices?prefix=sensor.print_ （每60秒自動刷新）</div>
+        <h1>列印狀態 (橫向捲動版)</h1>
+        <div class="sub">
+          資料來源：
+          /devices?prefix=sensor.print_&suffix=_action,_fwversion,_c,_m,_y,_k,_p,_w,_a,_yk,_cm,_z1,_z2
+          （每 60 秒自動刷新）
+        </div>
       </div>
       <div class="controls">
-        <button id="btnColumns" class="btn">欄位</button>
+        <span class="pill">欄位順序：_action → _fwversion → _c → _m → _y → _k → _p → _w → _a → _yk → _cm → _z1 → _z2</span>
         <button id="btnRefresh" class="btn">立即刷新</button>
       </div>
       <div class="table-wrap">
@@ -379,119 +377,84 @@ def status2_page():
         </div>
       </div>
       <div class="statusbar">
-        <div><span>筆數：<span id="count">0</span></span>　
-             <span>最後更新：<span id="updated">—</span></span></div>
+        <div>
+          <span>筆數：<span id="count">0</span></span>
+          <span style="margin-left:12px">最後更新：<span id="updated">—</span></span>
+        </div>
         <div class="mono err" id="msg"></div>
       </div>
     </div>
   </div>
 
-  <!-- 欄位面板 -->
-  <div id="columnPanel" class="col-panel" hidden>
-    <div class="col-panel-inner">
-      <div class="col-hdr">
-        <strong>顯示欄位</strong>
-        <div class="col-actions">
-          <button id="btnAllOn" class="btn sm">全選</button>
-          <button id="btnAllOff" class="btn sm">全不選</button>
-          <button id="btnApply" class="btn sm">套用</button>
-          <button id="btnClose" class="btn sm">關閉</button>
-        </div>
-      </div>
-      <div class="col-list" id="colList"></div>
-    </div>
-  </div>
-
   <script>
-  const DEVICES_URL = "/devices?prefix=sensor.print_";
-  const REFRESH_MS = 60000;
-  let allFields = [];
-  let visibleFields = [];
-  const LS_KEY = "status2_visible_fields";
+    const SUFFIX_ORDER = ["_action","_fwversion","_c","_m","_y","_k","_p","_w","_a","_yk","_cm","_z1","_z2"];
+    const DEVICES_URL = "/devices?prefix=sensor.print_&suffix=_action,_fwversion,_c,_m,_y,_k,_p,_w,_a,_yk,_cm,_z1,_z2";
+    const REFRESH_MS = 60000;
 
-  const elHead = document.getElementById('thead');
-  const elBody = document.getElementById('tbody');
-  const elCount = document.getElementById('count');
-  const elUpdated = document.getElementById('updated');
-  const elMsg = document.getElementById('msg');
-  const elPanel = document.getElementById('columnPanel');
-  const elColList = document.getElementById('colList');
+    const elHead = document.getElementById('thead');
+    const elBody = document.getElementById('tbody');
+    const elCount = document.getElementById('count');
+    const elUpdated = document.getElementById('updated');
+    const elMsg = document.getElementById('msg');
+    const elBtn = document.getElementById('btnRefresh');
 
-  function fmt(v){ return (v==null)?"":String(v); }
-
-  function renderHead(){
-    const cols = ["裝置", ...visibleFields];
-    elHead.innerHTML = cols.map(c=>`<th>${c}</th>`).join("");
-  }
-
-  function toRows(payload){
-    const rows=[];
-    const devs = Array.isArray(payload?.devices)?payload.devices:[];
-    for(const d of devs){
-      const id=d.device_id||"";
-      const m=d.metrics||{};
-      const row = { device:id };
-      for(const k of visibleFields) row[k]=m[k]?.value??"";
-      rows.push(row);
+    function renderHead(){
+      const cols = ["裝置", ...SUFFIX_ORDER];
+      elHead.innerHTML = cols.map(c => `<th>${c}</th>`).join("");
     }
-    return rows;
-  }
 
-  function renderBody(rows){
-    if(!rows.length){ elBody.innerHTML=`<tr><td colspan="${visibleFields.length+1}" style="text-align:center;padding:18px;color:#9fb3c8">無資料</td></tr>`; elCount.textContent="0"; return; }
-    elCount.textContent = rows.length;
-    elBody.innerHTML = rows.map(r=>{
-      const cells=[`<td>${fmt(r.device)}</td>`];
-      for(const k of visibleFields) cells.push(`<td>${fmt(r[k])}</td>`);
-      return `<tr>${cells.join("")}</tr>`;
-    }).join("");
-  }
+    function fmt(v){
+      if(v === null || v === undefined) return "";
+      return String(v);
+    }
 
-  async function refresh(){
-    elMsg.textContent="";
-    try{
-      const res=await fetch(DEVICES_URL,{headers:{"Accept":"application/json"}});
-      if(!res.ok) throw new Error("HTTP "+res.status);
-      const j=await res.json();
-      const devs = Array.isArray(j.devices)?j.devices:[];
-      const keys=new Set();
-      for(const d of devs) Object.keys(d.metrics||{}).forEach(k=>keys.add(k));
-      allFields=[...keys];
-      if(!visibleFields.length){
-        const saved = JSON.parse(localStorage.getItem(LS_KEY)||"[]");
-        visibleFields = saved.length? saved : allFields.slice(0,10);
+    function toRows(payload){
+      const rows=[];
+      const devices = Array.isArray(payload?.devices)? payload.devices : [];
+      for(const d of devices){
+        const id = d?.device_id ?? "";
+        const m = d?.metrics ?? {};
+        const row = {device:id};
+        for(const sfx of SUFFIX_ORDER){
+          row[sfx] = m[sfx]?.value ?? "";
+        }
+        rows.push(row);
       }
-      renderHead();
-      renderBody(toRows(j));
-      elUpdated.textContent = new Date().toLocaleString();
-    }catch(e){ elMsg.textContent="讀取失敗："+e.message; }
-  }
+      return rows;
+    }
 
-  document.getElementById('btnRefresh').onclick=refresh;
+    function renderBody(rows){
+      if(!rows.length){
+        elBody.innerHTML = `<tr><td colspan="${1+SUFFIX_ORDER.length}" style="text-align:center;color:#9fb3c8;padding:18px">無資料</td></tr>`;
+        elCount.textContent = "0";
+        return;
+      }
+      const html = rows.map(r=>{
+        const cells = [`<td>${fmt(r.device)}</td>`];
+        for(const sfx of SUFFIX_ORDER) cells.push(`<td>${fmt(r[sfx])}</td>`);
+        return `<tr>${cells.join("")}</tr>`;
+      }).join("");
+      elBody.innerHTML = html;
+      elCount.textContent = String(rows.length);
+    }
 
-  // 欄位選單
-  function openPanel(){
-    elColList.innerHTML=allFields.map(f=>{
-      const chk=visibleFields.includes(f)?'checked':'';
-      return `<div class="col-row"><input type="checkbox" value="${f}" ${chk}><div class="col-name">${f}</div></div>`;
-    }).join("");
-    elPanel.hidden=false;
-  }
-  function closePanel(){ elPanel.hidden=true; }
-  document.getElementById('btnColumns').onclick=openPanel;
-  document.getElementById('btnClose').onclick=closePanel;
-  document.getElementById('btnAllOn').onclick=()=>elColList.querySelectorAll("input").forEach(i=>i.checked=true);
-  document.getElementById('btnAllOff').onclick=()=>elColList.querySelectorAll("input").forEach(i=>i.checked=false);
-  document.getElementById('btnApply').onclick=()=>{
-    visibleFields=[...elColList.querySelectorAll("input:checked")].map(i=>i.value);
-    localStorage.setItem(LS_KEY,JSON.stringify(visibleFields));
+    async function refresh(){
+      elMsg.textContent = "";
+      try{
+        const res = await fetch(DEVICES_URL, { headers: {"Accept":"application/json"} });
+        if(!res.ok) throw new Error("HTTP "+res.status);
+        const json = await res.json();
+        renderBody(toRows(json));
+        elUpdated.textContent = new Date().toLocaleString();
+      }catch(err){
+        elMsg.textContent = "讀取失敗：" + err.message;
+      }
+    }
+
     renderHead();
     refresh();
-    closePanel();
-  }
-
-  refresh();
-  setInterval(refresh, REFRESH_MS);
+    elBtn.addEventListener('click', refresh);
+    setInterval(refresh, REFRESH_MS);
   </script>
 </body>
 </html>
