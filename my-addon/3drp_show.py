@@ -213,7 +213,7 @@ def status_page():
     const elBtn = document.getElementById('btnRefresh');
 
     function renderHead() {
-      const cols = ["裝置", ...currentFields().map(k => FIELD_LABELS[k] || k)];
+      const cols = ["裝置", ...SUFFIX_ORDER];
       elHead.innerHTML = cols.map(c => `<th>${c}</th>`).join("");
     }
 
@@ -468,7 +468,7 @@ function fmt(v){ return (v===null || v===undefined) ? "" : String(v); }
 function currentFields(){ return FIELD_KEYS.filter(k => visibleSet.has(k)); }
 
 function renderHead(){
-  const cols = ["裝置", ...currentFields()];
+  const cols = ["裝置", ...currentFields().map(k => FIELD_LABELS[k] || k)];
   elHead.innerHTML = cols.map(c => `<th>${c}</th>`).join("");
 }
 
