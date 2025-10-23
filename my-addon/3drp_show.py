@@ -365,13 +365,12 @@ def status2_page():
         <h1>列印狀態（/status2）</h1>
         <div class="sub">
           資料來源：
-          <code id="srcText">http://192.168.1.14:8099/devices?prefix=sensor.testprint_&amp;suffix=_action,_e,_al,_c,_cm,_dn,_fs,_fwversion,_he,_id,_k,_m,_p,_page,_tsrm,_w,_y,_yk,_ymov,_z1,_z2</code>
+          <code id="srcText">/devices?prefix=sensor.testprint_&amp;suffix=_a,_action,_al,_c,_cm,_dn,_fs,_fwversion,_he,_id,_k,_m,_p,_page,_tsrm,_w,_y,_yk,_ymov,_z1,_z2</code>
           （每 60 秒自動刷新）
         </div>
       </div>
 
       <div class="controls">
-        <span class="pill">模式：<span id="modeTag" class="tag live">Live</span></span>
         <button id="btnFilter" class="btn">顯示 / 隱藏欄位</button>
         <button id="btnRefresh" class="btn">立即刷新</button>
 
@@ -408,11 +407,11 @@ def status2_page():
   </div>
 
 <script>
-/* ---------- Live API 設定（固定打到 192.168.1.14:8099） ---------- */
-const DEVICES_URL = "http://192.168.1.14:8099/devices?prefix=sensor.testprint_&suffix=_action,_e,_al,_c,_cm,_dn,_fs,_fwversion,_he,_id,_k,_m,_p,_page,_tsrm,_w,_y,_yk,_ymov,_z1,_z2";
+/* ---------- Live API 設定 ---------- */
+const DEVICES_URL = "/devices?prefix=sensor.testprint_&suffix=_a,_action,_al,_c,_cm,_dn,_fs,_fwversion,_he,_id,_k,_m,_p,_page,_tsrm,_w,_y,_yk,_ymov,_z1,_z2";
 
 /* ---------- 欄位定義（依 suffix 順序） ---------- */
-const FIELD_KEYS = ["_action","_e","_al","_c","_cm","_dn","_fs","_fwversion","_he","_id","_k","_m","_p","_page","_tsrm","_w","_y","_yk","_ymov","_z1","_z2"];
+const FIELD_KEYS = ["_a","_action","_al","_c","_cm","_dn","_fs","_fwversion","_he","_id","_k","_m","_p","_page","_tsrm","_w","_y","_yk","_ymov","_z1","_z2"];
 
 /* ---------- 偏好持久化 ---------- */
 const LS_KEY = "status2_visible_columns_v2";
