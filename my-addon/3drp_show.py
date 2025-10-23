@@ -281,93 +281,113 @@ def status2_page():
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>列印狀態面板 (可橫向捲動)</title>
-  <style>
-    :root{
-      --bg:#0b0f14;--panel:#10161d;--panel2:#151c24;--text:#e6eef8;--muted:#9fb3c8;
-      --accent:#3ea6ff;--ok:#4ade80;--danger:#ef4444;--border:#223246;
-      --shadow:0 10px 24px rgba(0,0,0,.35);
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{
-      margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Noto Sans,"Helvetica Neue",Arial;
-      background:
-        radial-gradient(1200px 600px at 100% -20%, #12202d, transparent),
-        radial-gradient(800px 500px at -20% 120%, #1a2a38, transparent),
-        var(--bg);
-      color:var(--text);
-    }
-    .container{max-width:95vw;margin:20px auto;padding:0 8px;}
-    .card{
-      width:100%;
-      background:linear-gradient(180deg,var(--panel),var(--panel2));
-      border:1px solid var(--border);
-      border-radius:16px;
-      box-shadow:var(--shadow);
-    }
-    .header{padding:18px 18px 0}
-    h1{margin:0;font-size:22px}
-    .sub{color:var(--muted);font-size:13px;margin-top:6px;word-break:break-all}
-    .controls{display:flex;gap:10px;align-items:center;padding:14px 18px 18px;flex-wrap:wrap}
-    .pill{border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-size:12px;color:var(--muted)}
-    .btn{border:1px solid #2b4256;background:linear-gradient(180deg,#15324a,#10273a);color:#d9f1ff;border-radius:10px;padding:8px 12px;cursor:pointer}
-    .btn:active{transform:translateY(1px)}
-    .table-wrap{border-top:1px solid var(--border);position:relative}
-    /* ✅ 開啟水平滾動 */
-    .scroller{
-      max-height:70vh;
-      overflow:auto;
-      overflow-x:auto;
-      -webkit-overflow-scrolling:touch;
-      overscroll-behavior:contain;
-    }
-    table{
-      width:max(1200px,100%);
-      border-collapse:separate;
-      border-spacing:0;
-      table-layout:auto;
-      min-width:100%;
-    }
-    thead th{
-      position:sticky;top:0;background:#0f151c;z-index:2;text-align:left;
-      font-size:13px;color:#c7d7ea;padding:10px 12px;
-      border-bottom:1px solid var(--border);border-right:1px solid var(--border);
-      white-space:nowrap;min-width:120px;
-    }
-    thead th:first-child,tbody td:first-child{
-      position:sticky;left:0;z-index:3;background:linear-gradient(180deg,var(--panel),var(--panel2));
-      border-right:1px solid var(--border);
-      min-width:200px;
-    }
-    tbody td{
-      padding:10px 12px;font-size:13px;color:#e6eef8;
-      border-bottom:1px solid #17212c;border-right:1px solid #17212c;
-      white-space:nowrap;
-    }
-    tbody tr:hover td{background:#0f1922}
-    .statusbar{display:flex;justify-content:space-between;gap:12px;padding:12px 16px;color:var(--muted);border-top:1px solid var(--border);background:#0c1218;font-size:12px;border-radius:0 0 16px 16px}
-    .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
-    .err{color:#ffd1d1}
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>列印狀態面板 /status2</title>
+<style>
+  :root{
+    --bg:#0b0f14;--panel:#10161d;--panel2:#151c24;--text:#e6eef8;--muted:#9fb3c8;
+    --accent:#3ea6ff;--ok:#4ade80;--danger:#ef4444;--border:#223246;
+    --shadow:0 10px 24px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Noto Sans,"Helvetica Neue",Arial;
+    background:
+      radial-gradient(1200px 600px at 100% -20%, #12202d, transparent),
+      radial-gradient(800px 500px at -20% 120%, #1a2a38, transparent),
+      var(--bg);
+    color:var(--text);
+  }
+  .container{max-width:95vw;margin:20px auto;padding:0 8px;}
+  .card{
+    width:100%;
+    background:linear-gradient(180deg,var(--panel),var(--panel2));
+    border:1px solid var(--border);
+    border-radius:16px;
+    box-shadow:var(--shadow);
+  }
+  .header{padding:18px 18px 0}
+  h1{margin:0;font-size:22px}
+  .sub{color:var(--muted);font-size:13px;margin-top:6px;word-break:break-all}
+  .controls{position:relative;display:flex;gap:10px;align-items:center;padding:14px 18px 18px;flex-wrap:wrap}
+  .pill{border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-size:12px;color:var(--muted)}
+  .btn{border:1px solid #2b4256;background:linear-gradient(180deg,#15324a,#10273a);color:#d9f1ff;border-radius:10px;padding:8px 12px;cursor:pointer}
+  .btn:active{transform:translateY(1px)}
+  .table-wrap{border-top:1px solid var(--border);position:relative}
+  .scroller{
+    max-height:70vh;overflow:auto;overflow-x:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  }
+  table{
+    width:max(1400px,100%);border-collapse:separate;border-spacing:0;table-layout:auto;min-width:100%;
+  }
+  thead th{
+    position:sticky;top:0;background:#0f151c;z-index:2;text-align:left;
+    font-size:13px;color:#c7d7ea;padding:10px 12px;
+    border-bottom:1px solid var(--border);border-right:1px solid var(--border);
+    white-space:nowrap;min-width:120px;
+  }
+  thead th:first-child,tbody td:first-child{
+    position:sticky;left:0;z-index:3;background:linear-gradient(180deg,var(--panel),var(--panel2));
+    border-right:1px solid var(--border);min-width:220px;
+  }
+  tbody td{
+    padding:10px 12px;font-size:13px;color:#e6eef8;
+    border-bottom:1px solid #17212c;border-right:1px solid #17212c;white-space:nowrap;
+  }
+  tbody tr:hover td{background:#0f1922}
+  .statusbar{display:flex;justify-content:space-between;gap:12px;padding:12px 16px;color:#muted;border-top:1px solid var(--border);background:#0c1218;font-size:12px;border-radius:0 0 16px 16px}
+  .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
+  .err{color:#ffd1d1}
+  .tag{padding:4px 8px;border:1px solid var(--border);border-radius:999px;font-size:12px}
+  .tag.live{background:#10273a;color:#d9f1ff;border-color:#2b4256}
+
+  /* 欄位過濾下拉 */
+  .filter-pop{
+    position:absolute; top:54px; left:18px; width:260px; max-height:340px;
+    background:linear-gradient(180deg,var(--panel),var(--panel2));
+    border:1px solid var(--border); border-radius:12px; box-shadow:var(--shadow);
+    padding:8px; overflow:auto; display:none; z-index:30;
+  }
+  .filter-pop.show{ display:block; }
+  .filter-head{ display:flex; align-items:center; justify-content:space-between; padding:6px 8px; border-bottom:1px solid var(--border); margin-bottom:6px; }
+  .filter-row{ display:flex; gap:8px; align-items:center; padding:6px 8px; border-bottom:1px solid #17212c; }
+  .filter-row:last-child{ border-bottom:0 }
+  .filter-row label{ flex:1; font-size:13px; color:var(--text); cursor:pointer }
+  .mini{ font-size:12px; color:var(--muted); }
+</style>
 </head>
 <body>
   <div class="container">
     <div class="card">
       <div class="header">
-        <h1>列印狀態 (橫向捲動版)</h1>
+        <h1>列印狀態（/status2）</h1>
         <div class="sub">
           資料來源：
-          /devices?prefix=sensor.print_&suffix=_action,_fwversion,_c,_m,_y,_k,_p,_w,_a,_yk,_cm,_z1,_z2
+          <code id="srcText">http://192.168.1.14:8099/devices?prefix=sensor.testprint_&amp;suffix=_action,_e,_al,_c,_cm,_dn,_fs,_fwversion,_he,_id,_k,_m,_p,_page,_tsrm,_w,_y,_yk,_ymov,_z1,_z2</code>
           （每 60 秒自動刷新）
         </div>
       </div>
+
       <div class="controls">
-        <span class="pill">欄位順序：_action → _fwversion → _c → _m → _y → _k → _p → _w → _a → _yk → _cm → _z1 → _z2</span>
+        <span class="pill">模式：<span id="modeTag" class="tag live">Live</span></span>
+        <button id="btnFilter" class="btn">顯示 / 隱藏欄位</button>
         <button id="btnRefresh" class="btn">立即刷新</button>
+
+        <!-- 欄位過濾下拉 -->
+        <div id="filterPop" class="filter-pop" role="dialog" aria-label="欄位過濾">
+          <div class="filter-head">
+            <div class="mini">勾選要顯示的欄位</div>
+            <div>
+              <button id="btnAllOn" class="btn" style="padding:4px 8px">全選</button>
+              <button id="btnAllOff" class="btn" style="padding:4px 8px">全不選</button>
+            </div>
+          </div>
+          <div id="filterList"></div>
+        </div>
       </div>
+
       <div class="table-wrap">
         <div class="scroller">
           <table id="t">
@@ -376,6 +396,7 @@ def status2_page():
           </table>
         </div>
       </div>
+
       <div class="statusbar">
         <div>
           <span>筆數：<span id="count">0</span></span>
@@ -386,76 +407,131 @@ def status2_page():
     </div>
   </div>
 
-  <script>
-    const SUFFIX_ORDER = ["_action","_fwversion","_c","_m","_y","_k","_p","_w","_a","_yk","_cm","_z1","_z2"];
-    const DEVICES_URL = "/devices?prefix=sensor.print_&suffix=_action,_fwversion,_c,_m,_y,_k,_p,_w,_a,_yk,_cm,_z1,_z2";
-    const REFRESH_MS = 60000;
+<script>
+/* ---------- Live API 設定（固定打到 192.168.1.14:8099） ---------- */
+const DEVICES_URL = "http://192.168.1.14:8099/devices?prefix=sensor.testprint_&suffix=_action,_e,_al,_c,_cm,_dn,_fs,_fwversion,_he,_id,_k,_m,_p,_page,_tsrm,_w,_y,_yk,_ymov,_z1,_z2";
 
-    const elHead = document.getElementById('thead');
-    const elBody = document.getElementById('tbody');
-    const elCount = document.getElementById('count');
-    const elUpdated = document.getElementById('updated');
-    const elMsg = document.getElementById('msg');
-    const elBtn = document.getElementById('btnRefresh');
+/* ---------- 欄位定義（依 suffix 順序） ---------- */
+const FIELD_KEYS = ["_action","_e","_al","_c","_cm","_dn","_fs","_fwversion","_he","_id","_k","_m","_p","_page","_tsrm","_w","_y","_yk","_ymov","_z1","_z2"];
 
-    function renderHead(){
-      const cols = ["裝置", ...SUFFIX_ORDER];
-      elHead.innerHTML = cols.map(c => `<th>${c}</th>`).join("");
+/* ---------- 偏好持久化 ---------- */
+const LS_KEY = "status2_visible_columns_v2";
+function loadVisibleSet(){
+  try{
+    const raw = localStorage.getItem(LS_KEY);
+    if(!raw) return null;
+    const arr = JSON.parse(raw);
+    if(Array.isArray(arr)) return new Set(arr.filter(k=>FIELD_KEYS.includes(k)));
+  }catch(_){}
+  return null;
+}
+function saveVisibleSet(set){
+  localStorage.setItem(LS_KEY, JSON.stringify([...set]));
+}
+let visibleSet = loadVisibleSet() || new Set(FIELD_KEYS);
+
+/* ---------- DOM ---------- */
+const elHead = document.getElementById('thead');
+const elBody = document.getElementById('tbody');
+const elCount = document.getElementById('count');
+const elUpdated = document.getElementById('updated');
+const elMsg = document.getElementById('msg');
+const elFilter = document.getElementById('filterPop');
+const elFilterList = document.getElementById('filterList');
+const REFRESH_MS = 60000;
+
+/* ---------- 工具 ---------- */
+function fmt(v){ return (v===null || v===undefined) ? "" : String(v); }
+function currentFields(){ return FIELD_KEYS.filter(k => visibleSet.has(k)); }
+
+function renderHead(){
+  const cols = ["裝置", ...currentFields()];
+  elHead.innerHTML = cols.map(c => `<th>${c}</th>`).join("");
+}
+
+function toRows(payload){
+  const rows = [];
+  const devices = Array.isArray(payload?.devices) ? payload.devices : [];
+  for(const d of devices){
+    const id = d?.device_id ?? "";
+    const m = d?.metrics ?? {};
+    const row = { device: id };
+    for(const key of currentFields()){
+      row[key] = m[key]?.value ?? "";
     }
+    rows.push(row);
+  }
+  return rows;
+}
 
-    function fmt(v){
-      if(v === null || v === undefined) return "";
-      return String(v);
-    }
+function renderBody(rows){
+  if(!rows.length){
+    elBody.innerHTML = `<tr><td colspan="${1+currentFields().length}" style="text-align:center;color:#9fb3c8;padding:18px">無資料</td></tr>`;
+    elCount.textContent = "0";
+    return;
+  }
+  elBody.innerHTML = rows.map(r=>{
+    const cells = [`<td>${fmt(r.device)}</td>`];
+    for(const key of currentFields()) cells.push(`<td>${fmt(r[key])}</td>`);
+    return `<tr>${cells.join("")}</tr>`;
+  }).join("");
+  elCount.textContent = String(rows.length);
+}
 
-    function toRows(payload){
-      const rows=[];
-      const devices = Array.isArray(payload?.devices)? payload.devices : [];
-      for(const d of devices){
-        const id = d?.device_id ?? "";
-        const m = d?.metrics ?? {};
-        const row = {device:id};
-        for(const sfx of SUFFIX_ORDER){
-          row[sfx] = m[sfx]?.value ?? "";
-        }
-        rows.push(row);
-      }
-      return rows;
-    }
-
-    function renderBody(rows){
-      if(!rows.length){
-        elBody.innerHTML = `<tr><td colspan="${1+SUFFIX_ORDER.length}" style="text-align:center;color:#9fb3c8;padding:18px">無資料</td></tr>`;
-        elCount.textContent = "0";
-        return;
-      }
-      const html = rows.map(r=>{
-        const cells = [`<td>${fmt(r.device)}</td>`];
-        for(const sfx of SUFFIX_ORDER) cells.push(`<td>${fmt(r[sfx])}</td>`);
-        return `<tr>${cells.join("")}</tr>`;
-      }).join("");
-      elBody.innerHTML = html;
-      elCount.textContent = String(rows.length);
-    }
-
-    async function refresh(){
-      elMsg.textContent = "";
-      try{
-        const res = await fetch(DEVICES_URL, { headers: {"Accept":"application/json"} });
-        if(!res.ok) throw new Error("HTTP "+res.status);
-        const json = await res.json();
-        renderBody(toRows(json));
-        elUpdated.textContent = new Date().toLocaleString();
-      }catch(err){
-        elMsg.textContent = "讀取失敗：" + err.message;
-      }
-    }
-
+async function loadLive(){
+  const res = await fetch(DEVICES_URL, { headers:{ "Accept":"application/json" }});
+  if(!res.ok) throw new Error("HTTP "+res.status);
+  return res.json();
+}
+async function refresh(){
+  elMsg.textContent = "";
+  try{
+    const data = await loadLive();
     renderHead();
-    refresh();
-    elBtn.addEventListener('click', refresh);
-    setInterval(refresh, REFRESH_MS);
-  </script>
+    renderBody(toRows(data));
+    elUpdated.textContent = new Date().toLocaleString();
+  }catch(e){
+    elMsg.textContent = "讀取失敗："+e.message;
+  }
+}
+
+/* ---------- 欄位過濾 UI ---------- */
+function rebuildFilterList(){
+  elFilterList.innerHTML = FIELD_KEYS.map(k => `
+    <div class="filter-row">
+      <input id="chk_${k}" type="checkbox" ${visibleSet.has(k) ? "checked":""}
+             onchange="toggleField('${k}', this.checked)" />
+      <label for="chk_${k}">${k}</label>
+    </div>
+  `).join("");
+}
+window.toggleField = function(k, on){
+  if(on) visibleSet.add(k); else visibleSet.delete(k);
+  saveVisibleSet(visibleSet);
+  refresh();
+};
+
+document.getElementById('btnFilter').addEventListener('click', ()=>{
+  if(elFilter.classList.contains('show')) { elFilter.classList.remove('show'); return; }
+  rebuildFilterList();
+  elFilter.classList.add('show');
+});
+document.addEventListener('click', (e)=>{
+  const btn = document.getElementById('btnFilter');
+  if(!elFilter.contains(e.target) && e.target !== btn){ elFilter.classList.remove('show'); }
+});
+document.getElementById('btnAllOn').addEventListener('click', ()=>{
+  visibleSet = new Set(FIELD_KEYS); saveVisibleSet(visibleSet); rebuildFilterList(); refresh();
+});
+document.getElementById('btnAllOff').addEventListener('click', ()=>{
+  visibleSet = new Set(); saveVisibleSet(visibleSet); rebuildFilterList(); refresh();
+});
+
+/* ---------- 啟動 ---------- */
+document.getElementById('btnRefresh').addEventListener('click', refresh);
+refresh();
+setInterval(refresh, REFRESH_MS);
+</script>
 </body>
 </html>
 """
