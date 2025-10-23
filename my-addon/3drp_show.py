@@ -337,7 +337,7 @@ def status2_page():
     border-bottom:1px solid #17212c;border-right:1px solid #17212c;white-space:nowrap;
   }
   tbody tr:hover td{background:#0f1922}
-  .statusbar{display:flex;justify-content:space-between;gap:12px;padding:12px 16px;color:#muted;border-top:1px solid var(--border);background:#0c1218;font-size:12px;border-radius:0 0 16px 16px}
+  .statusbar{display:flex;justify-content:space-between;gap:12px;padding:12px 16px;color: var(--muted);  border-top:1px solid var(--border);background:#0c1218;font-size:12px;border-radius:0 0 16px 16px}
   .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
   .err{color:#ffd1d1}
   .tag{padding:4px 8px;border:1px solid var(--border);border-radius:999px;font-size:12px}
@@ -524,10 +524,11 @@ function rebuildFilterList(){
     <div class="filter-row">
       <input id="chk_${k}" type="checkbox" ${visibleSet.has(k) ? "checked":""}
              onchange="toggleField('${k}', this.checked)" />
-      <label for="chk_${k}">${k}</label>
+      <label for="chk_${k}">${FIELD_LABELS[k] || k}</label>
     </div>
   `).join("");
 }
+
 window.toggleField = function(k, on){
   if(on) visibleSet.add(k); else visibleSet.delete(k);
   saveVisibleSet(visibleSet);
