@@ -213,7 +213,7 @@ def status_page():
     const elBtn = document.getElementById('btnRefresh');
 
     function renderHead() {
-      const cols = ["裝置", ...SUFFIX_ORDER];
+      const cols = ["裝置", ...currentFields().map(k => FIELD_LABELS[k] || k)];
       elHead.innerHTML = cols.map(c => `<th>${c}</th>`).join("");
     }
 
@@ -413,6 +413,30 @@ const DEVICES_URL = "/devices?prefix=sensor.testprint_&suffix=_a,_action,_al,_c,
 /* ---------- 欄位定義（依 suffix 順序） ---------- */
 const FIELD_KEYS = ["_a","_action","_al","_c","_cm","_dn","_fs","_fwversion","_he","_id","_k","_m","_p","_page","_tsrm","_w","_y","_yk","_ymov","_z1","_z2"];
 
+// 給每個欄位一個乾淨的顯示名（可自訂）
+const FIELD_LABELS = {
+  "_a":"A",
+  "_action":"Action",
+  "_al":"AL",
+  "_c":"C",
+  "_cm":"CM",
+  "_dn":"DN",
+  "_fs":"FS",
+  "_fwversion":"FWVersion",
+  "_he":"HE",
+  "_id":"ID",
+  "_k":"K",
+  "_m":"M",
+  "_p":"P",
+  "_page":"Page",
+  "_tsrm":"TSRM",
+  "_w":"W",
+  "_y":"Y",
+  "_yk":"YK",
+  "_ymov":"Ymov",
+  "_z1":"Z1",
+  "_z2":"Z2"
+};
 /* ---------- 偏好持久化 ---------- */
 const LS_KEY = "status2_visible_columns_v2";
 function loadVisibleSet(){
