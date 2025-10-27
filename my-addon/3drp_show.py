@@ -2,28 +2,32 @@
 import logging
 import json
 import requests
-import os
 from datetime import datetime, timezone
-from flask import Flask, request, jsonify
-from flask import Response  # 放在檔案開頭的 import 區域（已有就略過）
+from flask import Flask, request, jsonify, Response
 
 # ---------------- 可自訂的查詢預設值 ----------------
-DEFAULT_QUERY  = ""             # 關鍵字
-DEFAULT_PREFIX = "sensor.zp2_"  # entity_id 開頭條件
-DEFAULT_SUFFIX = "_p25"         # entity_id 結尾條件
-DEFAULT_LIMIT  = 500            # 最多回傳幾筆
+# 以下為 /devices API 的預設查詢條件，
+# 若前端（或瀏覽器 URL）未帶入相對應參數時，將採用這些值。
+#
+# 🧭 /devices 基本呼叫格式：
+#   http://<HOST>:<PORT>/devices?prefix=<開頭>&suffix=<結尾1>,<結尾2>&query=<關鍵字>&limit=<筆數>
+#
+# 🔍 範例：
+#   http://localhost:8099/devices?prefix=sensor.zp2_&suffix=_p25,_co2
+#   → 取出所有 entity_id 以 sensor.zp2_ 開頭，且結尾為 _p25 或 _co2 的實體
+#
+#   若網址沒帶 prefix/suffix/query/limit，則使用以下預設值。
 
+DEFAULT_QUERY  = ""                   # 關鍵字（比對 entity_id 或 friendly_name）
+DEFAULT_PREFIX = "sensor.testprint_"  # entity_id 開頭條件，例：sensor.zp2_*
+DEFAULT_SUFFIX = "_action"            # entity_id 結尾條件，可多個（逗號分隔）
+DEFAULT_LIMIT  = 100                  # 最多回傳幾筆裝置資料（防止過量）
 # ---------------- 你的原始參數（沿用） ----------------
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
 with open("/data/options.json", "r", encoding="utf-8") as f:
     options = json.load(f)
 
-TOPICS = options.get("mqtt_topics", "+/+/data,+/+/control").split(",")
-MQTT_BROKER = options.get("mqtt_broker", "core-mosquitto")
-MQTT_PORT = int(options.get("mqtt_port", 1883))
-MQTT_USERNAME = options.get("mqtt_username", "")
-MQTT_PASSWORD = options.get("mqtt_password", "")
 LONG_TOKEN = options.get("HA_LONG_LIVED_TOKEN", "")
 
 HEADERS = {
@@ -81,199 +85,8 @@ def _match_suffix(entity_id: str, suffixes: list[str]):
         if entity_id.endswith(s):
             return s, s
     return None, None
-
-def _device_label_from_base(base: str) -> str:
-    """
-    base: '3drp_211242142' -> '3DRP_211242142'
-    其它前綴不處理大小寫。
-    """
-    if base.startswith("3drp"):
-        return "3DRP" + base[len("3drp"):]
-    return base
-
 # ---------------- Flask API ----------------
 app = Flask(__name__)
-
-@app.get("/status")
-def status_page():
-    html = r"""
-<!DOCTYPE html>
-<html lang="zh-Hant">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>列印狀態面板</title>
-  <style>
-    :root{
-      --bg:#0b0f14;--panel:#10161d;--panel2:#151c24;--text:#e6eef8;--muted:#9fb3c8;
-      --accent:#3ea6ff;--ok:#4ade80;--danger:#ef4444;--border:#223246;
-      --shadow:0 10px 24px rgba(0,0,0,.35);
-    }
-    *{box-sizing:border-box}
-    html,body{height:100%}
-    body{
-      margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Noto Sans,"Helvetica Neue",Arial;
-      background:
-        radial-gradient(1200px 600px at 100% -20%, #12202d, transparent),
-        radial-gradient(800px 500px at -20% 120%, #1a2a38, transparent),
-        var(--bg);
-      color:var(--text);
-    }
-    /* ✅ 改成幾乎全螢幕寬度 */
-    .container{
-      max-width:95vw;
-      margin:20px auto;
-      padding:0 8px;
-    }
-    .card{
-      width:100%;
-      background:linear-gradient(180deg,var(--panel),var(--panel2));
-      border:1px solid var(--border);
-      border-radius:16px;
-      box-shadow:var(--shadow);
-    }
-    .header{padding:18px 18px 0}
-    h1{margin:0;font-size:22px}
-    .sub{color:var(--muted);font-size:13px;margin-top:6px;word-break:break-all}
-    .controls{display:flex;gap:10px;align-items:center;padding:14px 18px 18px;flex-wrap:wrap}
-    .pill{border:1px solid var(--border);border-radius:999px;padding:6px 10px;font-size:12px;color:var(--muted)}
-    .btn{border:1px solid #2b4256;background:linear-gradient(180deg,#15324a,#10273a);color:#d9f1ff;border-radius:10px;padding:8px 12px;cursor:pointer}
-    .btn:active{transform:translateY(1px)}
-    .table-wrap{border-top:1px solid var(--border)}
-    .scroller{max-height:70vh;overflow:auto}
-    /* ✅ 讓表格撐滿整個寬度並自動換行 */
-    table{
-      width:100%;
-      min-width:100%;
-      border-collapse:separate;
-      border-spacing:0;
-      table-layout:auto;
-    }
-    thead th{
-      position:sticky;top:0;background:#0f151c;z-index:1;text-align:left;
-      font-size:13px;color:#c7d7ea;padding:10px 12px;
-      border-bottom:1px solid var(--border);border-right:1px solid var(--border);
-    }
-    thead th:last-child{border-right:0}
-    tbody td{
-      padding:10px 12px;font-size:13px;color:#e6eef8;
-      border-bottom:1px solid #17212c;border-right:1px solid #17212c;
-      white-space:normal;word-break:break-all; /* ✅ 可換行 */
-    }
-    tbody td:last-child{border-right:0}
-    tbody tr:hover td{background:#0f1922}
-    .statusbar{display:flex;justify-content:space-between;gap:12px;padding:12px 16px;color:var(--muted);border-top:1px solid var(--border);background:#0c1218;font-size:12px;border-radius:0 0 16px 16px}
-    .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
-    .err{color:#ffd1d1}
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="card">
-      <div class="header">
-        <h1>列印狀態</h1>
-        <div class="sub">
-          資料來源：
-          /devices?prefix=sensor.print_&suffix=_action,_fwversion,_c,_m,_y,_k,_p,_w,_a,_yk,_cm,_z1,_z2
-          （每 60 秒自動刷新）
-        </div>
-      </div>
-      <div class="controls">
-        <span class="pill">欄位順序：_action → _fwversion → _c → _m → _y → _k → _p → _w → _a → _yk → _cm → _z1 → _z2</span>
-        <button id="btnRefresh" class="btn">立即刷新</button>
-      </div>
-      <div class="table-wrap">
-        <div class="scroller">
-          <table id="t">
-            <thead><tr id="thead"></tr></thead>
-            <tbody id="tbody"></tbody>
-          </table>
-        </div>
-      </div>
-      <div class="statusbar">
-        <div>
-          <span>筆數：<span id="count">0</span></span>
-          <span style="margin-left:12px">最後更新：<span id="updated">—</span></span>
-        </div>
-        <div class="mono err" id="msg"></div>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    const SUFFIX_ORDER = ["_action","_fwversion","_c","_m","_y","_k","_p","_w","_a","_yk","_cm","_z1","_z2"];
-    const DEVICES_URL = "/devices?prefix=sensor.print_&suffix=_action,_fwversion,_c,_m,_y,_k,_p,_w,_a,_yk,_cm,_z1,_z2";
-    const REFRESH_MS = 60000; // 每分鐘刷新
-
-    const elHead = document.getElementById('thead');
-    const elBody = document.getElementById('tbody');
-    const elCount = document.getElementById('count');
-    const elUpdated = document.getElementById('updated');
-    const elMsg = document.getElementById('msg');
-    const elBtn = document.getElementById('btnRefresh');
-
-    function renderHead() {
-      const cols = ["裝置", ...SUFFIX_ORDER];
-      elHead.innerHTML = cols.map(c => `<th>${c}</th>`).join("");
-    }
-
-    function fmt(v) {
-      if (v === null || v === undefined) return "";
-      return String(v);
-    }
-
-    function toRows(payload) {
-      const rows = [];
-      const devices = Array.isArray(payload?.devices) ? payload.devices : [];
-      for (const d of devices) {
-        const id = d?.device_id ?? "";
-        const m = d?.metrics ?? {};
-        const row = { device: id };
-        for (const sfx of SUFFIX_ORDER) {
-          row[sfx] = m[sfx]?.value ?? "";
-        }
-        rows.push(row);
-      }
-      return rows;
-    }
-
-    function renderBody(rows) {
-      if (!rows.length) {
-        elBody.innerHTML = `<tr><td colspan="${1+SUFFIX_ORDER.length}" style="text-align:center;color:#9fb3c8;padding:18px">無資料</td></tr>`;
-        elCount.textContent = "0";
-        return;
-      }
-      const html = rows.map(r => {
-        const cells = [`<td>${fmt(r.device)}</td>`];
-        for (const sfx of SUFFIX_ORDER) cells.push(`<td>${fmt(r[sfx])}</td>`);
-        return `<tr>${cells.join("")}</tr>`;
-      }).join("");
-      elBody.innerHTML = html;
-      elCount.textContent = String(rows.length);
-    }
-
-    async function refresh() {
-      elMsg.textContent = "";
-      try {
-        const res = await fetch(DEVICES_URL, { headers: { "Accept": "application/json" } });
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        const json = await res.json();
-        renderBody(toRows(json));
-        elUpdated.textContent = new Date().toLocaleString();
-      } catch (err) {
-        elMsg.textContent = "讀取失敗：" + err.message;
-      }
-    }
-
-    renderHead();
-    refresh();
-    elBtn.addEventListener('click', refresh);
-    setInterval(refresh, REFRESH_MS);
-  </script>
-</body>
-</html>
-"""
-    return Response(html, mimetype="text/html; charset=utf-8")
 
 @app.get("/status2")
 def status2_page():
@@ -567,14 +380,6 @@ def health():
 
 @app.get("/devices")
 def devices_view():
-    """
-    聚合同裝置輸出（方案B：只回 value + last_updated，無 unit）
-    Query:
-      - query   : 關鍵字（比對 entity_id / friendly_name）
-      - prefix  : entity_id 開頭（例 sensor.3drp_）
-      - suffix  : 可多個（重複帶或逗號分隔），例：state,cttm_usedwatercontrol,lid_state
-      - limit   : 限制輸出的『裝置台數』（預設 DEFAULT_LIMIT）
-    """
     query   = request.args.get("query", DEFAULT_QUERY).strip()
     prefix  = request.args.get("prefix", DEFAULT_PREFIX).strip()
     limit   = int(request.args.get("limit", DEFAULT_LIMIT))
@@ -610,7 +415,6 @@ def devices_view():
 
             # 正常化裝置標籤
             device_label = base_wo_suffix
-            # device_label = _device_label_from_base(base_wo_suffix)
 
             # 收集 metrics（key 就是完整 suffix：matched_suffix）
             row = devices_map.setdefault(device_label, {"device_id": device_label, "metrics": {}})

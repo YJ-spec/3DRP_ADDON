@@ -1,5 +1,5 @@
 ﻿name: "curiejet 3DRP integration"
-version: "1.1.13"
+version: "1.1.14"
 slug: "curiejet_integration"
 description: "This Home Assistant add-on listens to MQTT messages and dynamically generates 
   MQTT Discovery configurations for CurieJet devices (e.g., 3DRP). 
@@ -15,9 +15,8 @@ url: "https://github.com/YJ-spec/3DRP_ADDON"
 init: false
 ingress: false
 
-# 刪掉 volumes
-# volumes:
-#   - /share:/share  
+# 這行才是關鍵：讓你可以打 http://supervisor/core/api
+homeassistant_api: true
 
 # 對外開放 8099
 ingress: false
@@ -30,10 +29,8 @@ ports_description:
 webui: "http://[HOST]:[PORT:8099]/status2"
 panel_icon: "mdi:view-list-outline"
 
-
 map:
   - share:rw
-
 
 options:
   mqtt_topics: "+/+/data,+/+/control"
