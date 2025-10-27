@@ -4,6 +4,7 @@ import json
 import requests
 from datetime import datetime, timezone
 from flask import Flask, request, jsonify, Response
+import os
 
 # ---------------- 可自訂的查詢預設值 ----------------
 # 以下為 /devices API 的預設查詢條件，
@@ -28,14 +29,23 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 with open("/data/options.json", "r", encoding="utf-8") as f:
     options = json.load(f)
 
-LONG_TOKEN = options.get("HA_LONG_LIVED_TOKEN", "")
+# LONG_TOKEN = options.get("HA_LONG_LIVED_TOKEN", "")
+
+# HEADERS = {
+#     "Authorization": f"Bearer {LONG_TOKEN}",
+#     "Content-Type": "application/json"
+# }
+
+# BASE_URL = options.get("ha_base_url", "http://homeassistant:8123/api").rstrip("/")
+
+SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN")
+BASE_URL = "http://supervisor/core/api"
 
 HEADERS = {
-    "Authorization": f"Bearer {LONG_TOKEN}",
-    "Content-Type": "application/json"
+    "Authorization": f"Bearer {SUPERVISOR_TOKEN}",
+    "Content-Type": "application/json",
 }
 
-BASE_URL = options.get("ha_base_url", "http://homeassistant:8123/api").rstrip("/")
 
 # HTTP 伺服器設定
 HTTP_HOST = options.get("http_host", "0.0.0.0")
@@ -43,8 +53,8 @@ HTTP_PORT = int(options.get("http_port", 8099))
 LOG_LEVEL  = options.get("log_level", "INFO").upper()
 logging.getLogger().setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
 
-if not LONG_TOKEN:
-    logging.warning("⚠️ HA Long-Lived Token 未設定（/data/options.json 的 HA_LONG_LIVED_TOKEN）。")
+if not SUPERVISOR_TOKEN:
+    logging.warning("⚠️ SUPERVISOR_TOKEN 未提供。請確認這個服務是以 HA Add-on 方式啟動，並且在 add-on config.yaml 中有 homeassistant_api: true")
 
 # ---------------- 核心：查清單 / 讀欄位 ----------------
 def _get_all_states():
