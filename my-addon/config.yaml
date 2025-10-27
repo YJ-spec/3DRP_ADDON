@@ -1,5 +1,5 @@
 ﻿name: "curiejet 3DRP integration"
-version: "1.1.18"
+version: "1.1.20"
 slug: "curiejet_integration"
 description: "This Home Assistant add-on listens to MQTT messages and dynamically generates 
   MQTT Discovery configurations for CurieJet devices (e.g., 3DRP). 
@@ -38,7 +38,7 @@ options:
   mqtt_port: 1883
   mqtt_username: ""
   mqtt_password: ""
-  HA_LONG_LIVED_TOKEN: ""
+  # HA_LONG_LIVED_TOKEN: ""
 
 schema:
   mqtt_topics: str
@@ -46,4 +46,4 @@ schema:
   mqtt_port: int
   mqtt_username: str?
   mqtt_password: str?
-  HA_LONG_LIVED_TOKEN: password?
+  # HA_LONG_LIVED_TOKEN: password?
