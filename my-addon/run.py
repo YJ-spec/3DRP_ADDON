@@ -18,15 +18,14 @@ MQTT_BROKER = options.get("mqtt_broker", "core-mosquitto")
 MQTT_PORT = int(options.get("mqtt_port", 1883))
 MQTT_USERNAME = options.get("mqtt_username", "")
 MQTT_PASSWORD = options.get("mqtt_password", "")
-LONG_TOKEN = options.get("HA_LONG_LIVED_TOKEN", "")
+
+SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN")
+BASE_URL = "http://supervisor/core/api"
 
 HEADERS = {
-    "Authorization": f"Bearer {LONG_TOKEN}",
-    "Content-Type": "application/json"
+    "Authorization": f"Bearer {SUPERVISOR_TOKEN}",
+    "Content-Type": "application/json",
 }
-
-# HA 標準 API 的 base URL
-BASE_URL = "http://homeassistant:8123/api"
 
 # 設定單位條件
 unit_conditions = {
