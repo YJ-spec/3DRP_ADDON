@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>列印狀態面板 /status2</title>
+<title>列印狀態面板</title>
 <style>
   :root{
     --bg:#0b0f14;--panel:#10161d;--panel2:#151c24;--text:#e6eef8;--muted:#9fb3c8;
@@ -95,7 +95,7 @@
   <div class="container">
     <div class="card">
       <div class="header">
-        <h1>列印狀態（/status2）</h1>
+        <h1>列印狀態（/status）</h1>
         <div class="sub">
           資料來源：
           <code id="srcText"></code>
@@ -148,14 +148,14 @@
    label = 表格欄位顯示名稱 + 過濾面板 checkbox 顯示文字
    ========================================================== */
 const COLUMN_CONFIG = [
-  { key: "_a",         label: "A" },
   { key: "_action",    label: "Action" },
+  { key: "_fwversion", label: "FWVersion" },
+  { key: "_a",         label: "A" },
   { key: "_al",        label: "AL" },
   { key: "_c",         label: "C" },
   { key: "_cm",        label: "CM" },
   { key: "_dn",        label: "DN" },
   { key: "_fs",        label: "FS" },
-  { key: "_fwversion", label: "FWVersion" },
   { key: "_he",        label: "HE" },
   { key: "_id",        label: "ID" },
   { key: "_k",         label: "K" },
