@@ -23,38 +23,31 @@ DEFAULT_QUERY  = ""                   # 關鍵字（比對 entity_id 或 friendl
 DEFAULT_PREFIX = "sensor.testprint_"  # entity_id 開頭條件，例：sensor.zp2_*
 DEFAULT_SUFFIX = "_action"            # entity_id 結尾條件，可多個（逗號分隔）
 DEFAULT_LIMIT  = 100                  # 最多回傳幾筆裝置資料（防止過量）
-# ---------------- 你的原始參數（沿用） ----------------
+
+# ---------------- Log參數設定 ----------------
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
+logging.getLogger().setLevel(logging.INFO)
 
-with open("/data/options.json", "r", encoding="utf-8") as f:
-    options = json.load(f)
-
-# LONG_TOKEN = options.get("HA_LONG_LIVED_TOKEN", "")
-
-# HEADERS = {
-#     "Authorization": f"Bearer {LONG_TOKEN}",
-#     "Content-Type": "application/json"
-# }
-
-# BASE_URL = options.get("ha_base_url", "http://homeassistant:8123/api").rstrip("/")
-
+# ---------------- HA API 設定 ----------------
+# 使用 Supervisor 內建 API token 進行授權。
+# 需在 add-on 的 config.yaml 中啟用：
+#   homeassistant_api: true
+# BASE_URL 指向 Home Assistant Core API 的內部位址（容器內固定）。
 SUPERVISOR_TOKEN = os.environ.get("SUPERVISOR_TOKEN")
 BASE_URL = "http://supervisor/core/api"
-
 HEADERS = {
     "Authorization": f"Bearer {SUPERVISOR_TOKEN}",
     "Content-Type": "application/json",
 }
-
-
-# HTTP 伺服器設定
-HTTP_HOST = options.get("http_host", "0.0.0.0")
-HTTP_PORT = int(options.get("http_port", 8099))
-LOG_LEVEL  = options.get("log_level", "INFO").upper()
-logging.getLogger().setLevel(getattr(logging, LOG_LEVEL, logging.INFO))
-
 if not SUPERVISOR_TOKEN:
-    logging.warning("⚠️ SUPERVISOR_TOKEN 未提供。請確認這個服務是以 HA Add-on 方式啟動，並且在 add-on config.yaml 中有 homeassistant_api: true")
+    logging.warning("⚠️ SUPERVISOR_TOKEN 未提供，請確認 add-on 啟用了 homeassistant_api: true")
+
+# ---------------- Flask HTTP 設定 ----------------
+# Flask 在容器內監聽的 IP 與 Port。
+# HTTP_HOST = "0.0.0.0" → 允許所有網路介面連線（外部可訪問）
+# HTTP_PORT = 8099 → 容器內部埠號；會在 add-on config.yaml 透過 ports 映射到外部（例如 8088:8099）
+HTTP_HOST = "0.0.0.0"
+HTTP_PORT = 8099
 
 # ---------------- 核心：查清單 / 讀欄位 ----------------
 def _get_all_states():
@@ -95,6 +88,7 @@ def _match_suffix(entity_id: str, suffixes: list[str]):
         if entity_id.endswith(s):
             return s, s
     return None, None
+
 # ---------------- Flask API ----------------
 app = Flask(__name__)
 
