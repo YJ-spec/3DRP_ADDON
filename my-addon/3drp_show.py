@@ -154,7 +154,12 @@ def status2_page():
     border-bottom:1px solid #17212c;border-right:1px solid #17212c;white-space:nowrap;
   }
   tbody tr:hover td{background:#0f1922}
-  .statusbar{display:flex;justify-content:space-between;gap:12px;padding:12px 16px;color: var(--muted);  border-top:1px solid var(--border);background:#0c1218;font-size:12px;border-radius:0 0 16px 16px}
+  .statusbar{
+    display:flex;justify-content:space-between;gap:12px;
+    padding:12px 16px;color: var(--muted);
+    border-top:1px solid var(--border);background:#0c1218;
+    font-size:12px;border-radius:0 0 16px 16px
+  }
   .mono{font-family:ui-monospace,Menlo,Consolas,monospace}
   .err{color:#ffd1d1}
   .tag{padding:4px 8px;border:1px solid var(--border);border-radius:999px;font-size:12px}
@@ -168,10 +173,18 @@ def status2_page():
     padding:8px; overflow:auto; display:none; z-index:30;
   }
   .filter-pop.show{ display:block; }
-  .filter-head{ display:flex; align-items:center; justify-content:space-between; padding:6px 8px; border-bottom:1px solid var(--border); margin-bottom:6px; }
-  .filter-row{ display:flex; gap:8px; align-items:center; padding:6px 8px; border-bottom:1px solid #17212c; }
+  .filter-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:6px 8px; border-bottom:1px solid var(--border); margin-bottom:6px;
+  }
+  .filter-row{
+    display:flex; gap:8px; align-items:center;
+    padding:6px 8px; border-bottom:1px solid #17212c;
+  }
   .filter-row:last-child{ border-bottom:0 }
-  .filter-row label{ flex:1; font-size:13px; color:var(--text); cursor:pointer }
+  .filter-row label{
+    flex:1; font-size:13px; color:var(--text); cursor:pointer
+  }
   .mini{ font-size:12px; color:var(--muted); }
 </style>
 </head>
@@ -182,7 +195,7 @@ def status2_page():
         <h1>列印狀態（/status2）</h1>
         <div class="sub">
           資料來源：
-          <code id="srcText">/devices?prefix=sensor.testprint_&amp;suffix=_a,_action,_al,_c,_cm,_dn,_fs,_fwversion,_he,_id,_k,_m,_p,_page,_tsrm,_w,_y,_yk,_ymov,_z1,_z2</code>
+          <code id="srcText"></code>
           （每 60 秒自動刷新）
         </div>
       </div>
@@ -224,53 +237,74 @@ def status2_page():
   </div>
 
 <script>
-/* ---------- Live API 設定 ---------- */
-const DEVICES_URL = "/devices?prefix=sensor.testprint_&suffix=_a,_action,_al,_c,_cm,_dn,_fs,_fwversion,_he,_id,_k,_m,_p,_page,_tsrm,_w,_y,_yk,_ymov,_z1,_z2";
+/* ==========================================================
+   ✅ 欄位設定（唯一需要維護的地方）
+   想新增/移除/改名稱，直接改這裡就好，其他程式會自動跟著更新。
 
-/* ---------- 欄位定義（依 suffix 順序） ---------- */
-const FIELD_KEYS = ["_a","_action","_al","_c","_cm","_dn","_fs","_fwversion","_he","_id","_k","_m","_p","_page","_tsrm","_w","_y","_yk","_ymov","_z1","_z2"];
+   key   = 後端 /devices 回傳時 metrics 裡面的 suffix，例如 "_action"
+   label = 表格欄位顯示名稱 + 過濾面板 checkbox 顯示文字
+   ========================================================== */
+const COLUMN_CONFIG = [
+  { key: "_a",         label: "A" },
+  { key: "_action",    label: "Action" },
+  { key: "_al",        label: "AL" },
+  { key: "_c",         label: "C" },
+  { key: "_cm",        label: "CM" },
+  { key: "_dn",        label: "DN" },
+  { key: "_fs",        label: "FS" },
+  { key: "_fwversion", label: "FWVersion" },
+  { key: "_he",        label: "HE" },
+  { key: "_id",        label: "ID" },
+  { key: "_k",         label: "K" },
+  { key: "_m",         label: "M" },
+  { key: "_p",         label: "P" },
+  { key: "_page",      label: "Page" },
+  { key: "_tsrm",      label: "TSRM" },
+  { key: "_w",         label: "W" },
+  { key: "_y",         label: "Y" },
+  { key: "_yk",        label: "YK" },
+  { key: "_ymov",      label: "Ymov" },
+  { key: "_z1",        label: "Z1" },
+  { key: "_z2",        label: "Z2" },
+];
 
-// 給每個欄位一個乾淨的顯示名（可自訂）
-const FIELD_LABELS = {
-  "_a":"A",
-  "_action":"Action",
-  "_al":"AL",
-  "_c":"C",
-  "_cm":"CM",
-  "_dn":"DN",
-  "_fs":"FS",
-  "_fwversion":"FWVersion",
-  "_he":"HE",
-  "_id":"ID",
-  "_k":"K",
-  "_m":"M",
-  "_p":"P",
-  "_page":"Page",
-  "_tsrm":"TSRM",
-  "_w":"W",
-  "_y":"Y",
-  "_yk":"YK",
-  "_ymov":"Ymov",
-  "_z1":"Z1",
-  "_z2":"Z2"
-};
-/* ---------- 偏好持久化 ---------- */
-const LS_KEY = "status2_visible_columns_v2";
+/* ==========================================================
+   ✅ API Query 設定
+   prefix   = 我們要看的 entity 開頭
+   suffixes = 自動把 COLUMN_CONFIG.key 串成逗號清單
+   DEVICES_URL = /devices?prefix=...&suffix=... （實際打的 API）
+   這也會被顯示到畫面上的 <code id="srcText">
+   ========================================================== */
+const DEFAULT_PREFIX = "sensor.testprint_";
+const SUFFIX_LIST = COLUMN_CONFIG.map(c => c.key).join(",");
+const DEVICES_URL = `/devices?prefix=${encodeURIComponent(DEFAULT_PREFIX)}&suffix=${encodeURIComponent(SUFFIX_LIST)}`;
+
+document.getElementById("srcText").textContent = DEVICES_URL;
+
+/* ---------- 偏好持久化（哪些欄位有顯示） ---------- */
+const LS_KEY = "status2_visible_columns_v3"; // 改版就換 key，避免舊資料衝突
+
 function loadVisibleSet(){
   try{
     const raw = localStorage.getItem(LS_KEY);
     if(!raw) return null;
     const arr = JSON.parse(raw);
-    if(Array.isArray(arr)) return new Set(arr.filter(k=>FIELD_KEYS.includes(k)));
+    // 過濾掉已經不存在的欄位 key
+    if(Array.isArray(arr)) {
+      return new Set(arr.filter(k => COLUMN_CONFIG.some(c => c.key === k)));
+    }
   }catch(_){}
   return null;
 }
+
 function saveVisibleSet(set){
   localStorage.setItem(LS_KEY, JSON.stringify([...set]));
 }
-let visibleSet = loadVisibleSet() || new Set(FIELD_KEYS);
 
-/* ---------- DOM ---------- */
+// 預設：全部欄位都顯示
+let visibleSet = loadVisibleSet() || new Set(COLUMN_CONFIG.map(c => c.key));
+
+/* ---------- DOM 快取 ---------- */
 const elHead = document.getElementById('thead');
 const elBody = document.getElementById('tbody');
 const elCount = document.getElementById('count');
@@ -281,11 +315,18 @@ const elFilterList = document.getElementById('filterList');
 const REFRESH_MS = 60000;
 
 /* ---------- 工具 ---------- */
-function fmt(v){ return (v===null || v===undefined) ? "" : String(v); }
-function currentFields(){ return FIELD_KEYS.filter(k => visibleSet.has(k)); }
+function fmt(v){
+  return (v===null || v===undefined) ? "" : String(v);
+}
+
+// 目前啟用的欄位 (依 COLUMN_CONFIG 順序過濾)
+function currentColumns(){
+  return COLUMN_CONFIG.filter(col => visibleSet.has(col.key));
+}
 
 function renderHead(){
-  const cols = ["裝置", ...currentFields().map(k => FIELD_LABELS[k] || k)];
+  // 第一欄固定"裝置"，後面依照 currentColumns()
+  const cols = ["裝置", ...currentColumns().map(col => col.label)];
   elHead.innerHTML = cols.map(c => `<th>${c}</th>`).join("");
 }
 
@@ -296,8 +337,8 @@ function toRows(payload){
     const id = d?.device_id ?? "";
     const m = d?.metrics ?? {};
     const row = { device: id };
-    for(const key of currentFields()){
-      row[key] = m[key]?.value ?? "";
+    for(const col of currentColumns()){
+      row[col.key] = m[col.key]?.value ?? "";
     }
     rows.push(row);
   }
@@ -306,15 +347,19 @@ function toRows(payload){
 
 function renderBody(rows){
   if(!rows.length){
-    elBody.innerHTML = `<tr><td colspan="${1+currentFields().length}" style="text-align:center;color:#9fb3c8;padding:18px">無資料</td></tr>`;
+    elBody.innerHTML = `<tr><td colspan="${1+currentColumns().length}" style="text-align:center;color:#9fb3c8;padding:18px">無資料</td></tr>`;
     elCount.textContent = "0";
     return;
   }
+
   elBody.innerHTML = rows.map(r=>{
     const cells = [`<td>${fmt(r.device)}</td>`];
-    for(const key of currentFields()) cells.push(`<td>${fmt(r[key])}</td>`);
+    for(const col of currentColumns()){
+      cells.push(`<td>${fmt(r[col.key])}</td>`);
+    }
     return `<tr>${cells.join("")}</tr>`;
   }).join("");
+
   elCount.textContent = String(rows.length);
 }
 
@@ -323,6 +368,7 @@ async function loadLive(){
   if(!res.ok) throw new Error("HTTP "+res.status);
   return res.json();
 }
+
 async function refresh(){
   elMsg.textContent = "";
   try{
@@ -337,35 +383,54 @@ async function refresh(){
 
 /* ---------- 欄位過濾 UI ---------- */
 function rebuildFilterList(){
-  elFilterList.innerHTML = FIELD_KEYS.map(k => `
+  elFilterList.innerHTML = COLUMN_CONFIG.map(col => `
     <div class="filter-row">
-      <input id="chk_${k}" type="checkbox" ${visibleSet.has(k) ? "checked":""}
-             onchange="toggleField('${k}', this.checked)" />
-      <label for="chk_${k}">${FIELD_LABELS[k] || k}</label>
+      <input
+        id="chk_${col.key}"
+        type="checkbox"
+        ${visibleSet.has(col.key) ? "checked":""}
+        onchange="toggleField('${col.key}', this.checked)" />
+      <label for="chk_${col.key}">${col.label}</label>
     </div>
   `).join("");
 }
 
-window.toggleField = function(k, on){
-  if(on) visibleSet.add(k); else visibleSet.delete(k);
+// 提供給 inline onchange 用
+window.toggleField = function(key, on){
+  if(on) visibleSet.add(key);
+  else   visibleSet.delete(key);
   saveVisibleSet(visibleSet);
   refresh();
 };
 
 document.getElementById('btnFilter').addEventListener('click', ()=>{
-  if(elFilter.classList.contains('show')) { elFilter.classList.remove('show'); return; }
+  if(elFilter.classList.contains('show')) {
+    elFilter.classList.remove('show');
+    return;
+  }
   rebuildFilterList();
   elFilter.classList.add('show');
 });
+
 document.addEventListener('click', (e)=>{
   const btn = document.getElementById('btnFilter');
-  if(!elFilter.contains(e.target) && e.target !== btn){ elFilter.classList.remove('show'); }
+  if(!elFilter.contains(e.target) && e.target !== btn){
+    elFilter.classList.remove('show');
+  }
 });
+
 document.getElementById('btnAllOn').addEventListener('click', ()=>{
-  visibleSet = new Set(FIELD_KEYS); saveVisibleSet(visibleSet); rebuildFilterList(); refresh();
+  visibleSet = new Set(COLUMN_CONFIG.map(c => c.key));
+  saveVisibleSet(visibleSet);
+  rebuildFilterList();
+  refresh();
 });
+
 document.getElementById('btnAllOff').addEventListener('click', ()=>{
-  visibleSet = new Set(); saveVisibleSet(visibleSet); rebuildFilterList(); refresh();
+  visibleSet = new Set();
+  saveVisibleSet(visibleSet);
+  rebuildFilterList();
+  refresh();
 });
 
 /* ---------- 啟動 ---------- */
