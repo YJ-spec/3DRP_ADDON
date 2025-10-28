@@ -90,8 +90,11 @@ def _match_suffix(entity_id: str, suffixes: list[str]):
     return None, None
 
 # ---------------- Flask API ----------------
-app = Flask(__name__, template_folder="templates")
-
+app = Flask(
+    __name__,
+    template_folder="templates",  # 放 status.html
+    static_folder="static"        # 放 status.js
+)
 @app.get("/status")
 def status_page():
     """顯示列印狀態面板"""

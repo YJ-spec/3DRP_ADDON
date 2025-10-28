@@ -11,6 +11,7 @@ COPY launcher.py /launcher.py
 
 # 拷貝前端模板 (整個資料夾)
 COPY templates/ /templates/
+COPY static/ /static/
 
 # 單一入口：同時啟兩支程式
 CMD ["python3", "/launcher.py"]
