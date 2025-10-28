@@ -1,10 +1,16 @@
 /* ==========================================================
-   ✅ 欄位設定（唯一需要維護的地方）
-   想新增/移除/改名稱，直接改這裡就好，其他程式會自動跟著更新。
-
-   key   = 後端 /devices 回傳時 metrics 裡面的 suffix，例如 "_action"
-   label = 表格欄位顯示名稱 + 過濾面板 checkbox 顯示文字
+   🧭 狀態面板可調參數區（唯一需要維護的部分）
    ========================================================== */
+/**
+ * ✅ 裝置名稱
+ * MQTT topic 裝置名稱
+ */
+const DEVICE_NAME   = "testprint";
+
+/**
+ * ✅ 欄位設定
+ * 由上往下依序顯示，屬性與名稱轉換表格
+ */
 const COLUMN_CONFIG = [
   { key: "_action",    label: "Action" },
   { key: "_fwversion", label: "FWVersion" },
@@ -29,28 +35,35 @@ const COLUMN_CONFIG = [
   { key: "_z2",        label: "Z2" },
 ];
 
+/**
+ * ✅ 自動刷新間隔（毫秒）
+ */
+const REFRESH_MS = 60000;
+
 /* ==========================================================
-   ✅ API Query 設定
-   prefix   = 我們要看的 entity 開頭
-   suffixes = 自動把 COLUMN_CONFIG.key 串成逗號清單
-   DEVICES_URL = /devices?prefix=...&suffix=... （實際打的 API）
-   這也會被顯示到畫面上的 <code id="srcText">
+   ✅ API Query 組合
+   prefix   = 要查的 entity 開頭
+   suffixes = 自動從 COLUMN_CONFIG 取出所有 key
+   DEVICES_URL = /devices?prefix=...&suffix=...
    ========================================================== */
-const DEFAULT_PREFIX = "sensor.testprint_";
+const DEFAULT_PREFIX = `sensor.${DEVICE_NAME}_`;
 const SUFFIX_LIST = COLUMN_CONFIG.map(c => c.key).join(",");
 const DEVICES_URL = `/devices?prefix=${encodeURIComponent(DEFAULT_PREFIX)}&suffix=${encodeURIComponent(SUFFIX_LIST)}`;
 
+// 初始化畫面上顯示資訊
 document.getElementById("srcText").textContent = DEVICES_URL;
+document.getElementById("refreshSec").textContent = (REFRESH_MS / 1000).toString();
 
-/* ---------- 偏好持久化（哪些欄位有顯示） ---------- */
-const LS_KEY = "status2_visible_columns_v3"; // 改版就換 key，避免舊資料衝突
+/* ==========================================================
+   🧩 偏好設定（欄位顯示儲存）
+   ========================================================== */
+const LS_KEY = "status2_visible_columns_v3"; // 改版可換 key，避免舊資料衝突
 
 function loadVisibleSet(){
   try{
     const raw = localStorage.getItem(LS_KEY);
     if(!raw) return null;
     const arr = JSON.parse(raw);
-    // 過濾掉已經不存在的欄位 key
     if(Array.isArray(arr)) {
       return new Set(arr.filter(k => COLUMN_CONFIG.some(c => c.key === k)));
     }
@@ -62,10 +75,12 @@ function saveVisibleSet(set){
   localStorage.setItem(LS_KEY, JSON.stringify([...set]));
 }
 
-// 預設：全部欄位都顯示
+// 預設全部欄位顯示
 let visibleSet = loadVisibleSet() || new Set(COLUMN_CONFIG.map(c => c.key));
 
-/* ---------- DOM 快取 ---------- */
+/* ==========================================================
+   🧩 DOM 快取
+   ========================================================== */
 const elHead = document.getElementById('thead');
 const elBody = document.getElementById('tbody');
 const elCount = document.getElementById('count');
@@ -73,20 +88,23 @@ const elUpdated = document.getElementById('updated');
 const elMsg = document.getElementById('msg');
 const elFilter = document.getElementById('filterPop');
 const elFilterList = document.getElementById('filterList');
-const REFRESH_MS = 60000;
 
-/* ---------- 工具 ---------- */
+/* ==========================================================
+   🧩 工具函式
+   ========================================================== */
 function fmt(v){
   return (v===null || v===undefined) ? "" : String(v);
 }
 
-// 目前啟用的欄位 (依 COLUMN_CONFIG 順序過濾)
+// 目前啟用的欄位（依 COLUMN_CONFIG 順序）
 function currentColumns(){
   return COLUMN_CONFIG.filter(col => visibleSet.has(col.key));
 }
 
+/* ==========================================================
+   🧩 表格渲染
+   ========================================================== */
 function renderHead(){
-  // 第一欄固定"裝置"，後面依照 currentColumns()
   const cols = ["裝置", ...currentColumns().map(col => col.label)];
   elHead.innerHTML = cols.map(c => `<th>${c}</th>`).join("");
 }
@@ -124,6 +142,9 @@ function renderBody(rows){
   elCount.textContent = String(rows.length);
 }
 
+/* ==========================================================
+   🧩 資料請求
+   ========================================================== */
 async function loadLive(){
   const res = await fetch(DEVICES_URL, { headers:{ "Accept":"application/json" }});
   if(!res.ok) throw new Error("HTTP "+res.status);
@@ -142,7 +163,9 @@ async function refresh(){
   }
 }
 
-/* ---------- 欄位過濾 UI ---------- */
+/* ==========================================================
+   🧩 欄位過濾面板
+   ========================================================== */
 function rebuildFilterList(){
   elFilterList.innerHTML = COLUMN_CONFIG.map(col => `
     <div class="filter-row">
@@ -156,7 +179,7 @@ function rebuildFilterList(){
   `).join("");
 }
 
-// 提供給 inline onchange 用（因為 HTML 不是 module，這需要掛到 window）
+// inline onchange 用
 window.toggleField = function(key, on){
   if(on) visibleSet.add(key);
   else   visibleSet.delete(key);
@@ -194,7 +217,9 @@ document.getElementById('btnAllOff').addEventListener('click', ()=>{
   refresh();
 });
 
-/* ---------- 啟動 ---------- */
+/* ==========================================================
+   🧩 啟動程序
+   ========================================================== */
 document.getElementById('btnRefresh').addEventListener('click', refresh);
 refresh();
 setInterval(refresh, REFRESH_MS);
