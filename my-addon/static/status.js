@@ -5,7 +5,7 @@
  * ✅ 裝置名稱
  * MQTT topic 裝置名稱
  */
-const DEVICE_NAME   = "testprint";
+const DEVICE_NAME   = "ComeTrue";
 
 /**
  * ✅ 欄位設定
