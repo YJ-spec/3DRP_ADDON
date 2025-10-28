@@ -6,6 +6,7 @@
  * MQTT topic 裝置名稱
  */
 const DEVICE_NAME   = "ComeTrue";
+const LOWER_DEVICE_NAME = DEVICE_NAME.toLowerCase();
 
 /**
  * ✅ 欄位設定
@@ -46,7 +47,7 @@ const REFRESH_MS = 60000;
    suffixes = 自動從 COLUMN_CONFIG 取出所有 key
    DEVICES_URL = /devices?prefix=...&suffix=...
    ========================================================== */
-const DEFAULT_PREFIX = `sensor.${DEVICE_NAME.toLowerCase()}_`;  // 自動轉成小寫
+const DEFAULT_PREFIX = `sensor.${LOWER_DEVICE_NAME}_`;  // 自動轉成小寫
 // const DEFAULT_PREFIX ="sensor.testprint_";
 const SUFFIX_LIST = COLUMN_CONFIG.map(c => c.key).join(",");
 const DEVICES_URL = `/devices?prefix=${encodeURIComponent(DEFAULT_PREFIX)}&suffix=${encodeURIComponent(SUFFIX_LIST)}`;
@@ -133,7 +134,12 @@ function renderBody(rows){
   }
 
   elBody.innerHTML = rows.map(r=>{
-    const cells = [`<td>${fmt(r.device)}</td>`];
+    let deviceName = r.device;
+    // 根據 DEVICE_NAME 自動比對小寫形式
+    if (deviceName.includes(LOWER_DEVICE_NAME)) {
+      deviceName = deviceName.replace(LOWER_DEVICE_NAME, DEVICE_NAME);
+    }
+    const cells = [`<td>${fmt(deviceName)}</td>`];
     for(const col of currentColumns()){
       cells.push(`<td>${fmt(r[col.key])}</td>`);
     }
