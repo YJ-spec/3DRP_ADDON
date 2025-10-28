@@ -46,7 +46,7 @@ const REFRESH_MS = 60000;
    suffixes = 自動從 COLUMN_CONFIG 取出所有 key
    DEVICES_URL = /devices?prefix=...&suffix=...
    ========================================================== */
-const DEFAULT_PREFIX = `sensor.${DEVICE_NAME}_`;
+const DEFAULT_PREFIX = `sensor.${DEVICE_NAME.toLowerCase()}_`;  // 自動轉成小寫
 // const DEFAULT_PREFIX ="sensor.testprint_";
 const SUFFIX_LIST = COLUMN_CONFIG.map(c => c.key).join(",");
 const DEVICES_URL = `/devices?prefix=${encodeURIComponent(DEFAULT_PREFIX)}&suffix=${encodeURIComponent(SUFFIX_LIST)}`;
