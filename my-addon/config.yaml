@@ -1,9 +1,9 @@
-﻿name: "curiejet 3DRP integration"
-version: "1.1.31"
-slug: "curiejet_integration"
+﻿name: "3DRP integration"
+version: "1.1.32"
+slug: "3DRP_integration"
 description: "This Home Assistant add-on listens to MQTT messages and dynamically generates 
-  MQTT Discovery configurations for CurieJet devices (e.g., 3DRP). 
-  It enables seamless integration of sensor and control data from various CurieJet models 
+  MQTT Discovery configurations for ComeTrue® devices (e.g., 3DRP). 
+  It enables seamless integration of sensor and control data from various ComeTrue® models 
   into your Home Assistant setup."
 startup: "services"
 boot: "auto"

@@ -1,12 +1,12 @@
-# 3DRP CurieJet Integration - 安裝與設定流程
+# 3DRP Integration - 安裝與設定流程
 
-本文件說明如何在 Home Assistant 中正確安裝並設定 **CurieJet Integration** 插件，  
-讓 CurieJet 裝置能自動被 Home Assistant 發現並建立感測器與控制項。
+本文件說明如何在 Home Assistant 中正確安裝並設定 **3DRP Integration** 插件，  
+讓 ComeTrue® 裝置能自動被 Home Assistant 發現並建立感測器與控制項。
 
 安裝步驟概述：
 1. 安裝並啟用 Mosquitto broker  
 2. 啟用 Home Assistant 的 MQTT 整合  
-3. 安裝並設定 CurieJet Integration 插件  
+3. 安裝並設定 3DRP Integration 插件  
 
 ---
 
@@ -36,10 +36,10 @@ customize:
 
 ---
 
-## ⚙️ 步驟 3. 安裝並設定 CurieJet Integration 插件
+## ⚙️ 步驟 3. 安裝並設定 3DRP Integration 插件
 
 1. 回到 **附加元件商店**  
-2. 安裝 **CurieJet 3DRP Integration**（CurieJet 專用整合外掛）  
+2. 安裝 **3DRP Integration**
 3. 打開插件的「設定」頁面，填入相關 MQTT 參數  
 ```yaml
 mqtt_topics: +/+/data,+/+/control
@@ -49,13 +49,13 @@ mqtt_username: test
 mqtt_password: test
 ```
 4. 儲存設定  
-5. 啟動 **CurieJet Integration** 插件  
+5. 啟動 **3DRP Integration** 插件  
 
 ---
 
 ## ✅ 完成！
 
-- CurieJet 裝置上線後會自動被 Home Assistant 偵測。  
+- ComeTrue® 裝置上線後會自動被 Home Assistant 偵測。  
 - 感測值與控制項會自動建立。  
 - 新增設備時無需重新設定。  
 
