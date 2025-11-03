@@ -95,7 +95,7 @@ def generate_mqtt_discovery_config(device_name, device_mac, sensor_type, sensor_
         "availability_topic": f"{device_name}/{device_mac}/status",  # ← 新增 LWT 主題
         "payload_available": "online",                 # LWT 上線訊息
         "payload_not_available": "offline",            # LWT 離線訊息
-        "expire_after": 300,
+        # "expire_after": 300,
         "value_template": f"{{{{ value_json.{sensor_type}.{sensor_name} }}}}",
         "unique_id": f"{device_name}_{device_mac}_{sensor_name}",
         "state_class": "measurement",
@@ -126,7 +126,7 @@ def generate_mqtt_discovery_textconfig(device_name, device_mac, sensor_type, sen
         "availability_topic": f"{device_name}/{device_mac}/status",  # ← 新增 LWT 主題
         "payload_available": "online",                 # LWT 上線訊息
         "payload_not_available": "offline",            # LWT 離線訊息
-        "expire_after": 300,
+        # "expire_after": 300,
         "value_template": f"{{{{ value_json.{sensor_type}.{sensor_name} }}}}",
         "unique_id": f"{device_name}_{device_mac}_{sensor_name}",
         "device": {
