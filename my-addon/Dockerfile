@@ -4,6 +4,7 @@ FROM python:3.11-alpine
 RUN pip install --no-cache-dir paho-mqtt requests flask PyYAML
 
 # 拷貝檔案
+COPY config.yaml /config.yaml
 COPY run.py /run.py
 COPY 3drp_show.py /3drp_show.py
 COPY external_bridge.conf /external_bridge.conf
