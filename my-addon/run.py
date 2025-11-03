@@ -14,7 +14,7 @@ import yaml
 def get_addon_version():
     """讀取 add-on 版本號，並加上識別字 'addon'"""
     try:
-        with open("/addon/config.yaml", "r", encoding="utf-8") as f:
+        with open("/config.yaml", "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
             if isinstance(data, dict):
                 version = data.get("version", "unknown")
