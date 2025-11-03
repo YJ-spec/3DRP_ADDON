@@ -208,6 +208,7 @@ def on_message(client, userdata, msg):
             logging.info(f"Published discovery config to {discovery_topic}")
         
         # 發完所有 config 後，補一筆 online 狀態（一次性）
+        time.sleep(1)
         status_topic = f"{device_name}/{device_mac}/status"
         client.publish(status_topic, "online", retain=False)
         logging.info(f"補發 online 狀態到 {status_topic}")
