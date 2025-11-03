@@ -1,5 +1,5 @@
 ﻿name: "3DRP integration"
-version: "1.1.35"
+version: "1.1.36"
 slug: "3drp_integration"
 description: "This Home Assistant add-on listens to MQTT messages and dynamically generates 
   MQTT Discovery configurations for ComeTrue® devices (e.g., 3DRP). 
