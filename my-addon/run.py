@@ -5,6 +5,7 @@ import requests
 import os
 import shutil
 import time
+import threading
 
 # 設定日誌格式
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
@@ -144,7 +145,16 @@ def generate_mqtt_discovery_textconfig(device_name, device_mac, sensor_type, sen
 
     return config
 
-		
+# 處理 MQTT Discovery 第一次上線 online
+def delayed_online_publish(client, device_name, device_mac):
+    status_topic = f"{device_name}/{device_mac}/status"
+    time.sleep(3)
+    client.publish(status_topic, "online", retain=False)
+    logging.info(f"補發 online 狀態到 {status_topic}")
+    time.sleep(2)
+    client.publish(status_topic, "online", retain=False)
+    logging.info(f"再次補發 online 狀態到 {status_topic}")
+
 # 處理 MQTT 訊息並產生 Discovery 設定
 def on_message(client, userdata, msg):
     payload = msg.payload.decode()
@@ -208,14 +218,12 @@ def on_message(client, userdata, msg):
             client.publish(discovery_topic, mqtt_payload, retain=True)
             logging.info(f"Published discovery config to {discovery_topic}")
         
-        # 發完所有 config 後，補一筆 online 狀態（一次性）
-        status_topic = f"{device_name}/{device_mac}/status"
-        time.sleep(3)  # 等 HA 訂閱 availability
-        client.publish(status_topic, "online", retain=False)
-        logging.info(f"補發 online 狀態到 {status_topic}")
-        time.sleep(2)  # 再補一次，避免競態
-        client.publish(status_topic, "online", retain=False)
-        logging.info(f"補發 online 狀態到 {status_topic}")
+        # 在 on_message() 裡這樣改：
+        threading.Thread(
+            target=delayed_online_publish,
+            args=(client, device_name, device_mac),
+            daemon=True
+        ).start()
 
     except json.JSONDecodeError:
         logging.error(f"Failed to decode payload: {payload}")
