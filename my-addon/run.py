@@ -92,6 +92,9 @@ def generate_mqtt_discovery_config(device_name, device_mac, sensor_type, sensor_
     config = {
         "name": sensor_name,
         "state_topic": topic,
+        "availability_topic": f"{device_name}/{device_mac}/status",  # ← 新增 LWT 主題
+        "payload_available": "online",                 # LWT 上線訊息
+        "payload_not_available": "offline",            # LWT 離線訊息
         "expire_after": 300,
         "value_template": f"{{{{ value_json.{sensor_type}.{sensor_name} }}}}",
         "unique_id": f"{device_name}_{device_mac}_{sensor_name}",
@@ -120,6 +123,9 @@ def generate_mqtt_discovery_textconfig(device_name, device_mac, sensor_type, sen
     config = {
         "name": sensor_name,
         "state_topic": topic,
+        "availability_topic": f"{device_name}/{device_mac}/status",  # ← 新增 LWT 主題
+        "payload_available": "online",                 # LWT 上線訊息
+        "payload_not_available": "offline",            # LWT 離線訊息
         "expire_after": 300,
         "value_template": f"{{{{ value_json.{sensor_type}.{sensor_name} }}}}",
         "unique_id": f"{device_name}_{device_mac}_{sensor_name}",
@@ -130,7 +136,7 @@ def generate_mqtt_discovery_textconfig(device_name, device_mac, sensor_type, sen
             "manufacturer": "CurieJet"
         }
     }
-
+    
     # 如果有單位才加上
     if sensor_name in unit_conditions:
         config["unit_of_measurement"] = unit_conditions[sensor_name]
