@@ -6,11 +6,33 @@ import os
 import shutil
 import time
 import threading
+import yaml
 
-# 設定日誌格式
+# ------------------------------------------------------------
+# 📦 讀取 Add-on 版本（從 config.yaml）
+# ------------------------------------------------------------
+def get_addon_version():
+    """讀取 add-on 版本號，並加上識別字 'addon'"""
+    try:
+        with open("/config/config.yaml", "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+            if isinstance(data, dict):
+                version = data.get("version", "unknown")
+                return f"Add-on {version}"
+    except Exception as e:
+        logging.warning(f"讀取 config.yaml 版本失敗: {e}")
+    return "Add-on unknown"
+
+ADDON_VERSION = get_addon_version()
+
+# ------------------------------------------------------------
+# 🧾 設定日誌格式
+# ------------------------------------------------------------
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(message)s')
 
-# 讀取 HA 傳入的選項設定
+# ------------------------------------------------------------
+# ⚙️ 讀取 HA 傳入的設定 (options.json)
+# ------------------------------------------------------------
 with open("/data/options.json", "r") as f:
     options = json.load(f)
 
@@ -29,7 +51,9 @@ HEADERS = {
     "Content-Type": "application/json",
 }
 
-# 設定單位條件
+# ------------------------------------------------------------
+# 🧮 感測單位對照表(for ZS2)
+# ------------------------------------------------------------
 unit_conditions = {
     "ct": "°C",
     "t": "°C",
@@ -44,6 +68,10 @@ unit_conditions = {
     "rset": "rpm",
     "rpm": "rpm"
 }
+
+# ------------------------------------------------------------
+# 🧩 檢查裝置是否已註冊
+# ------------------------------------------------------------
 def is_device_registered(device_name, device_mac, candidate_sensors):
     """檢查裝置是否已註冊，只要其中一個代表性實體存在即可"""
     for sensor in candidate_sensors:
@@ -58,7 +86,9 @@ def is_device_registered(device_name, device_mac, candidate_sensors):
             logging.error(f"查詢 {entity_id} 發生錯誤: {e}")
     return False
 
-# 新增這段 function：檢查是否需要回傳控制指令
+# ------------------------------------------------------------
+# 🔁 檢查是否需要回傳控制指令(for ZS2)
+# ------------------------------------------------------------
 def check_and_respond_control(client, topic, message_json):
     parts = topic.split('/')
     if len(parts) < 3:
@@ -76,15 +106,18 @@ def check_and_respond_control(client, topic, message_json):
         client.publish(control_topic, control_payload)
         logging.info(f"Sent control message to {control_topic}: {control_payload}")
 
-
-        
-# 當連線成功時執行
+# ------------------------------------------------------------
+# 🔗 MQTT 連線成功
+# ------------------------------------------------------------
 def on_connect(client, userdata, flags, rc):
     logging.info(f"Connected to MQTT broker with result code {rc}")
     for topic in TOPICS:
         client.subscribe(topic)
         logging.info(f"Subscribed to topic: {topic}")
 
+# ------------------------------------------------------------
+# 🏗️ 產生 MQTT Discovery Config（數值型）
+# ------------------------------------------------------------
 def generate_mqtt_discovery_config(device_name, device_mac, sensor_type, sensor_name):
     """ 根據 MQTT 訊息生成 Home Assistant MQTT Discovery 設定 """
     # 生成 topic
@@ -106,7 +139,8 @@ def generate_mqtt_discovery_config(device_name, device_mac, sensor_type, sensor_
             "identifiers": f"{device_name}_{device_mac}",
             "name": f"{device_name}_{device_mac}",
             "model": device_name,
-            "manufacturer": "CurieJet"
+            "manufacturer": "CurieJet",
+            "sw_version": ADDON_VERSION
         }
     }
 
@@ -116,6 +150,9 @@ def generate_mqtt_discovery_config(device_name, device_mac, sensor_type, sensor_
 
     return config
 
+# ------------------------------------------------------------
+# 🏗️ 產生 MQTT Discovery Config（文字型）
+# ------------------------------------------------------------
 def generate_mqtt_discovery_textconfig(device_name, device_mac, sensor_type, sensor_name):
     """ 根據 MQTT 訊息生成 Home Assistant MQTT Discovery 設定 """
     # 生成 topic
@@ -135,7 +172,8 @@ def generate_mqtt_discovery_textconfig(device_name, device_mac, sensor_type, sen
             "identifiers": f"{device_name}_{device_mac}",
             "name": f"{device_name}_{device_mac}",
             "model": device_name,
-            "manufacturer": "CurieJet"
+            "manufacturer": "CurieJet",
+            "sw_version": ADDON_VERSION
         }
     }
     
@@ -145,17 +183,21 @@ def generate_mqtt_discovery_textconfig(device_name, device_mac, sensor_type, sen
 
     return config
 
-# 處理 MQTT Discovery 第一次上線 online
+# ------------------------------------------------------------
+# 🔔 延遲補發 Online 狀態
+# ------------------------------------------------------------
 def delayed_online_publish(client, device_name, device_mac):
     status_topic = f"{device_name}/{device_mac}/status"
-    time.sleep(3)
+    time.sleep(1)
     client.publish(status_topic, "online", retain=False)
     logging.info(f"補發 online 狀態到 {status_topic}")
-    time.sleep(2)
+    time.sleep(3)
     client.publish(status_topic, "online", retain=False)
     logging.info(f"再次補發 online 狀態到 {status_topic}")
 
-# 處理 MQTT 訊息並產生 Discovery 設定
+# ------------------------------------------------------------
+# 📨 處理 MQTT 訊息
+# ------------------------------------------------------------
 def on_message(client, userdata, msg):
     payload = msg.payload.decode()
     logging.info(f"Received message on {msg.topic}: {payload}")
@@ -230,6 +272,9 @@ def on_message(client, userdata, msg):
     except Exception as e:
         logging.error(f"Error processing message: {e}")
 
+# ------------------------------------------------------------
+# 🧱 複製 MQTT 橋接設定檔(for 中控橋接觀察數據 預設路徑192.168.51.8)
+# ------------------------------------------------------------
 def create_mqtt_bridge_conf():
     """ 複製 MQTT 桥接配置文件到目标目录 """
     source_file = '/external_bridge.conf'  # 源文件路徑
@@ -247,7 +292,10 @@ def create_mqtt_bridge_conf():
     except Exception as e:
         # 錯誤處理，記錄錯誤訊息
         logging.error(f"Error copying file {source_file} to {target_directory}: {e}")
-        
+
+# ------------------------------------------------------------
+# 🚀 主程式
+# ------------------------------------------------------------
 def main():
     logging.info("Add-on started")
 
