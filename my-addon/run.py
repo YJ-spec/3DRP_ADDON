@@ -14,7 +14,7 @@ import yaml
 def get_addon_version():
     """讀取 add-on 版本號，並加上識別字 'addon'"""
     try:
-        with open("/config/config.yaml", "r", encoding="utf-8") as f:
+        with open("/addon/config.yaml", "r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
             if isinstance(data, dict):
                 version = data.get("version", "unknown")
@@ -139,7 +139,7 @@ def generate_mqtt_discovery_config(device_name, device_mac, sensor_type, sensor_
             "identifiers": f"{device_name}_{device_mac}",
             "name": f"{device_name}_{device_mac}",
             "model": device_name,
-            "manufacturer": "CurieJet",
+            # "manufacturer": "CurieJet",
             "sw_version": ADDON_VERSION
         }
     }
@@ -172,7 +172,7 @@ def generate_mqtt_discovery_textconfig(device_name, device_mac, sensor_type, sen
             "identifiers": f"{device_name}_{device_mac}",
             "name": f"{device_name}_{device_mac}",
             "model": device_name,
-            "manufacturer": "CurieJet",
+            # "manufacturer": "CurieJet",
             "sw_version": ADDON_VERSION
         }
     }
