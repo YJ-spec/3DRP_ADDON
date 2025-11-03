@@ -139,7 +139,7 @@ def generate_mqtt_discovery_config(device_name, device_mac, sensor_type, sensor_
             "identifiers": f"{device_name}_{device_mac}",
             "name": f"{device_name}_{device_mac}",
             "model": device_name,
-            "manufacturer": device_name,
+            "manufacturer": device_name
             # "sw_version": ADDON_VERSION
         }
     }
@@ -172,7 +172,7 @@ def generate_mqtt_discovery_textconfig(device_name, device_mac, sensor_type, sen
             "identifiers": f"{device_name}_{device_mac}",
             "name": f"{device_name}_{device_mac}",
             "model": device_name,
-            "manufacturer": device_name,
+            "manufacturer": device_name
             # "sw_version": ADDON_VERSION
         }
     }
