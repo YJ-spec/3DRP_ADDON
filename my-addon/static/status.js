@@ -34,6 +34,8 @@ const COLUMN_CONFIG = [
   //{ key: "_ymov",      label: "Ymov" },
   { key: "_z1",        label: "Z1高度" },
   { key: "_z2",        label: "Z2高度" },
+  { key: "_swversion", label: "軟體版本" },
+  { key: "_model",     label: "機台型號" },
 ];
 
 /**
