@@ -88,9 +88,9 @@ def is_device_registered(device_name, device_mac, format_version):
             logging.info(f"未找到 {entity_id} → 視為未註冊")
             return False
 
-        ha_state = response.json().get("state")
-        if str(ha_state) == str(format_version):
-            # logging.info(f"{entity_id} 的 FormatVersion 一致 ({format_version}) → 已註冊")
+        ha_format_version = data.get("attributes", {}).get("FormatVersion")
+        if str(ha_format_version) == str(format_version):
+            logging.info(f"{entity_id} 的 FormatVersion 一致 ({format_version}) → 已註冊")
             return True
         else:
             logging.info(f"{entity_id} 的 FormatVersion 不一致 (HA={ha_state}, MQTT={format_version}) → 未註冊")
