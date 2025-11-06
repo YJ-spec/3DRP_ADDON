@@ -79,7 +79,13 @@ def is_device_registered(device_name, device_mac, format_version):
     - HA 有但版本不同 → False
     - HA 有且版本相同 → True
     """
-    entity_id = f"sensor.{device_name}_{device_mac}_FormatVersion"
+    # 保險起見做成跟 discovery 一樣的命名
+    # dev = str(device_name).lower()
+    # mac = str(device_mac).lower()
+    dev = device_name
+    mac = device_mac
+
+    entity_id = f"sensor.{dev}_{mac}_FormatVersion"
     url = f"{BASE_URL}/states/{entity_id}"
 
     try:
@@ -88,12 +94,14 @@ def is_device_registered(device_name, device_mac, format_version):
             logging.info(f"未找到 {entity_id} → 視為未註冊")
             return False
 
+        data = response.json()
         ha_format_version = data.get("attributes", {}).get("FormatVersion")
+
         if str(ha_format_version) == str(format_version):
             logging.info(f"{entity_id} 的 FormatVersion 一致 ({format_version}) → 已註冊")
             return True
         else:
-            logging.info(f"{entity_id} 的 FormatVersion 不一致 (HA={ha_state}, MQTT={format_version}) → 未註冊")
+            logging.info(f"{entity_id} 的 FormatVersion 不一致 (HA={ha_format_version}, MQTT={format_version}) → 未註冊")
             return False
 
     except Exception as e:
@@ -198,6 +206,44 @@ def generate_mqtt_discovery_textconfig(device_name, device_mac, sensor_type, sen
     return config
 
 # ------------------------------------------------------------
+# 🔔 清除註冊
+# ------------------------------------------------------------
+def clear_discovery_for_device(client, device_name, device_mac):
+    """
+    清掉 HA 裡面這台裝置所有對應的 MQTT Discovery config。
+    做法：查 HA 所有 state，找出 sensor.<dev>_<mac>_*，逐一發空的 retain。
+    """
+    # dev = str(device_name).lower()
+    # mac = str(device_mac).lower()
+    dev = device_name
+    mac = device_mac
+    prefix = f"sensor.{dev}_{mac}_"
+
+    url = f"{BASE_URL}/states"
+    try:
+        resp = requests.get(url, headers=HEADERS, timeout=5)
+        resp.raise_for_status()
+        states = resp.json()
+    except Exception as e:
+        logging.error(f"[rediscover] 無法取得 HA states，改成只清本次欄位: {e}")
+        return False
+
+    cleared = 0
+    for s in states:
+        eid = s.get("entity_id", "")
+        if not eid.startswith(prefix):
+            continue
+
+        # sensor.xxx_yyy_zzz -> zzz
+        sensor_suffix = eid.split(prefix, 1)[1]
+        disc_topic = f"homeassistant/sensor/{dev}_{mac}_{sensor_suffix}/config"
+        client.publish(disc_topic, "", retain=True)
+        logging.info(f"[rediscover] clear {disc_topic}")
+        cleared += 1
+
+    logging.info(f"[rediscover] 已清除 {cleared} 筆舊的 discovery")
+    return True
+# ------------------------------------------------------------
 # 🔔 延遲補發 Online 狀態
 # ------------------------------------------------------------
 def delayed_online_publish(client, device_name, device_mac):
@@ -225,10 +271,7 @@ def clear_and_rediscover(client, device_name, device_mac, message_json):
         sensors_to_register.append(sensor)
 
     # ① 清除舊的 discovery
-    for sensor_name in sensors_to_register:
-        discovery_topic = f"homeassistant/sensor/{device_name}_{device_mac}_{sensor_name}/config"
-        client.publish(discovery_topic, "", retain=True)
-        logging.info(f"[rediscover] clear {discovery_topic}")
+    clear_discovery_for_device(client, device_name, device_mac)
 
     # ② 等一小下，給 HA 時間處理
     time.sleep(0.7)
