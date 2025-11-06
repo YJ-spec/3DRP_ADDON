@@ -95,7 +95,7 @@ def is_device_registered(device_name, device_mac, format_version):
             return False
 
         data = response.json()
-        ha_format_version = data.get("state")  # ← 改這裡
+        ha_format_version = data.get("attributes", {}).get("hw_version")
 
         if str(ha_format_version) == str(format_version):
             logging.info(f"{entity_id} 的 FormatVersion 一致 ({format_version}) → 已註冊")
@@ -140,7 +140,7 @@ def on_connect(client, userdata, flags, rc):
 # ------------------------------------------------------------
 # 🏗️ 產生 MQTT Discovery Config（數值型）
 # ------------------------------------------------------------
-def generate_mqtt_discovery_config(device_name, device_mac, sensor_type, sensor_name):
+def generate_mqtt_discovery_config(device_name, device_mac, sensor_type, sensor_name,format_version):
     """ 根據 MQTT 訊息生成 Home Assistant MQTT Discovery 設定 """
     # 生成 topic
     topic = f"{device_name}/{device_mac}/data"
@@ -162,7 +162,8 @@ def generate_mqtt_discovery_config(device_name, device_mac, sensor_type, sensor_
             "name": f"{device_name}_{device_mac}",
             "model": device_name,
             "manufacturer": device_name,
-            "sw_version": ADDON_VERSION
+            "sw_version": ADDON_VERSION,
+            "hw_version": str(format_version) if format_version else "unknown"
         }
     }
 
@@ -175,7 +176,7 @@ def generate_mqtt_discovery_config(device_name, device_mac, sensor_type, sensor_
 # ------------------------------------------------------------
 # 🏗️ 產生 MQTT Discovery Config（文字型）
 # ------------------------------------------------------------
-def generate_mqtt_discovery_textconfig(device_name, device_mac, sensor_type, sensor_name):
+def generate_mqtt_discovery_textconfig(device_name, device_mac, sensor_type, sensor_name,format_version):
     """ 根據 MQTT 訊息生成 Home Assistant MQTT Discovery 設定 """
     # 生成 topic
     topic = f"{device_name}/{device_mac}/data"
@@ -195,7 +196,8 @@ def generate_mqtt_discovery_textconfig(device_name, device_mac, sensor_type, sen
             "name": f"{device_name}_{device_mac}",
             "model": device_name,
             "manufacturer": device_name,
-            "sw_version": ADDON_VERSION
+            "sw_version": ADDON_VERSION,
+            "hw_version": str(format_version) if format_version else "unknown"
         }
     }
     
@@ -270,6 +272,8 @@ def clear_and_rediscover(client, device_name, device_mac, message_json):
     for sensor in text_sensors.keys():
         sensors_to_register.append(sensor)
 
+    format_version = (text_sensors.get("FormatVersion") or message_json.get("FormatVersion") or "unknown")
+
     # ① 清除舊的 discovery
     clear_discovery_for_device(client, device_name, device_mac)
 
@@ -280,11 +284,11 @@ def clear_and_rediscover(client, device_name, device_mac, message_json):
     discovery_configs = []
 
     for sensor, value in data_sensors.items():
-        cfg = generate_mqtt_discovery_config(device_name, device_mac, "data", sensor)
+        cfg = generate_mqtt_discovery_config(device_name, device_mac, "data", sensor,format_version)
         discovery_configs.append(cfg)
 
     for sensor, value in text_sensors.items():
-        cfg = generate_mqtt_discovery_textconfig(device_name, device_mac, "textdata", sensor)
+        cfg = generate_mqtt_discovery_textconfig(device_name, device_mac, "textdata", sensor,format_version)
         discovery_configs.append(cfg)
 
     for cfg in discovery_configs:
