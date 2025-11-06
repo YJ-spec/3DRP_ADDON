@@ -72,19 +72,33 @@ unit_conditions = {
 # ------------------------------------------------------------
 # 🧩 檢查裝置是否已註冊
 # ------------------------------------------------------------
-def is_device_registered(device_name, device_mac, candidate_sensors):
-    """檢查裝置是否已註冊，只要其中一個代表性實體存在即可"""
-    for sensor in candidate_sensors:
-        entity_id = f"sensor.{device_name}_{device_mac}_{sensor}"
-        url = f"{BASE_URL}/states/{entity_id}"
-        try:
-            response = requests.get(url, headers=HEADERS)
-            if response.status_code == 200:
-                logging.info(f"裝置 {device_name}_{device_mac} 已註冊（找到 {entity_id}）")
-                return True
-        except Exception as e:
-            logging.error(f"查詢 {entity_id} 發生錯誤: {e}")
-    return False
+def is_device_registered(device_name, device_mac, format_version):
+    """
+    檢查 HA 中的 FormatVersion 是否與設備傳入的相同。
+    - HA 沒這個實體 → False
+    - HA 有但版本不同 → False
+    - HA 有且版本相同 → True
+    """
+    entity_id = f"sensor.{device_name}_{device_mac}_FormatVersion"
+    url = f"{BASE_URL}/states/{entity_id}"
+
+    try:
+        response = requests.get(url, headers=HEADERS, timeout=5)
+        if response.status_code != 200:
+            logging.info(f"未找到 {entity_id} → 視為未註冊")
+            return False
+
+        ha_state = response.json().get("state")
+        if str(ha_state) == str(format_version):
+            # logging.info(f"{entity_id} 的 FormatVersion 一致 ({format_version}) → 已註冊")
+            return True
+        else:
+            logging.info(f"{entity_id} 的 FormatVersion 不一致 (HA={ha_state}, MQTT={format_version}) → 未註冊")
+            return False
+
+    except Exception as e:
+        logging.error(f"查詢 {entity_id} 發生錯誤: {e}")
+        return False
 
 # ------------------------------------------------------------
 # 🔁 檢查是否需要回傳控制指令(for ZS2)
@@ -191,9 +205,53 @@ def delayed_online_publish(client, device_name, device_mac):
     time.sleep(1)
     client.publish(status_topic, "online", retain=False)
     logging.info(f"補發 online 狀態到 {status_topic}")
-    time.sleep(3)
-    client.publish(status_topic, "online", retain=False)
-    logging.info(f"再次補發 online 狀態到 {status_topic}")
+    # time.sleep(3)
+    # client.publish(status_topic, "online", retain=False)
+    # logging.info(f"再次補發 online 狀態到 {status_topic}")
+
+# ------------------------------------------------------------
+# 🔔 延遲 清除註冊 & 重新註冊
+# ------------------------------------------------------------
+def clear_and_rediscover(client, device_name, device_mac, message_json):
+    # 先整理這次要註冊的所有 sensor 名稱
+    sensors_to_register = []
+
+    data_sensors = message_json.get("data", {}) or {}
+    for sensor in data_sensors.keys():
+        sensors_to_register.append(sensor)
+
+    text_sensors = message_json.get("textdata", {}) or {}
+    for sensor in text_sensors.keys():
+        sensors_to_register.append(sensor)
+
+    # ① 清除舊的 discovery
+    for sensor_name in sensors_to_register:
+        discovery_topic = f"homeassistant/sensor/{device_name}_{device_mac}_{sensor_name}/config"
+        client.publish(discovery_topic, "", retain=True)
+        logging.info(f"[rediscover] clear {discovery_topic}")
+
+    # ② 等一小下，給 HA 時間處理
+    time.sleep(0.7)
+
+    # ③ 再發新的 discovery
+    discovery_configs = []
+
+    for sensor, value in data_sensors.items():
+        cfg = generate_mqtt_discovery_config(device_name, device_mac, "data", sensor)
+        discovery_configs.append(cfg)
+
+    for sensor, value in text_sensors.items():
+        cfg = generate_mqtt_discovery_textconfig(device_name, device_mac, "textdata", sensor)
+        discovery_configs.append(cfg)
+
+    for cfg in discovery_configs:
+        discovery_topic = f"homeassistant/sensor/{device_name}_{device_mac}_{cfg['name']}/config"
+        payload = json.dumps(cfg, indent=2)
+        client.publish(discovery_topic, payload, retain=True)
+        logging.info(f"[rediscover] publish {discovery_topic}")
+
+    # ④ 補發 online
+    delayed_online_publish(client, device_name, device_mac)
 
 # ------------------------------------------------------------
 # 📨 處理 MQTT 訊息
@@ -216,54 +274,25 @@ def on_message(client, userdata, msg):
             return
         device_name = topic_parts[0]
         device_mac = topic_parts[1]
-		
-        # 準備感測器名稱列表
-        candidate_sensors = (
-                list(message_json.get("data", {}).keys()) +
-                list(message_json.get("data1", {}).keys()) +
-                list(message_json.get("textdata", {}).keys())
-            )
-        # candidate_sensors = list(message_json.get("data", {}).keys()) + list(message_json.get("data1", {}).keys() + list(message_json.get("textdata", {}).keys())
+        textdata = message_json.get("textdata", {}) or {}
+        format_version = textdata.get("FormatVersion")
+
         # 裝置已註冊，跳過 discovery 設定
-        if is_device_registered(device_name, device_mac, candidate_sensors):
-            return  
-            
         if not device_name or not device_mac:
-            logging.warning(f"Missing deviceName or deviceMac in message: {payload}")
+            # logging.warning(f"Missing deviceName or deviceMac in message: {payload}")
             return
-        
-        # 生成對應的 MQTT Discovery 配置
-        discovery_configs = []
-        
-        # 處理 data 欄位的感測器
-        data_sensors = message_json.get("data", {})
-        for sensor, value in data_sensors.items():
-            config = generate_mqtt_discovery_config(device_name, device_mac, "data", sensor)
-            discovery_configs.append(config)
+        if not format_version:
+            # logging.info(f"{device_name}/{device_mac} 無 FormatVersion，跳過註冊判斷。")
+            return
 
-        # 處理 data1 欄位的感測器
-        data1_sensors = message_json.get("data1", {})
-        for sensor, value in data1_sensors.items():
-            config = generate_mqtt_discovery_config(device_name, device_mac, "data1", sensor)
-            discovery_configs.append(config)
+        if is_device_registered(device_name, device_mac, format_version):
+            # logging.info(f"{device_name}/{device_mac} 已註冊（FormatVersion 相同）。")
+            return  # 已註冊 → 不重發 Discovery
 
-        # 處理 textdata 欄位的感測器
-        data1_sensors = message_json.get("textdata", {})
-        for sensor, value in data1_sensors.items():
-            config = generate_mqtt_discovery_textconfig(device_name, device_mac, "textdata", sensor)
-            discovery_configs.append(config)
-
-        # 推送 MQTT Discovery 配置到 HA
-        for config in discovery_configs:
-            discovery_topic = f"homeassistant/sensor/{device_name}_{device_mac}_{config['name']}/config"
-            mqtt_payload = json.dumps(config, indent=2)
-            client.publish(discovery_topic, mqtt_payload, retain=True)
-            logging.info(f"Published discovery config to {discovery_topic}")
-        
         # 在 on_message() 裡這樣改：
         threading.Thread(
-            target=delayed_online_publish,
-            args=(client, device_name, device_mac),
+            target=clear_and_rediscover,
+            args=(client, device_name, device_mac, message_json),
             daemon=True
         ).start()
 
