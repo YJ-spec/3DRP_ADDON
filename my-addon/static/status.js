@@ -7,7 +7,7 @@
  */
 const DEVICE_NAME   = "ComeTrue";
 const LOWER_DEVICE_NAME = DEVICE_NAME.toLowerCase();
-
+const DEFAULT_VISIBLE_KEYS = ["_action", "_dn", "_page","_z1","_model"];  // ← 換成你要的欄位 key
 /**
  * ✅ 欄位設定
  * 由上往下依序顯示，屬性與名稱轉換表格
@@ -80,7 +80,8 @@ function saveVisibleSet(set){
 }
 
 // 預設全部欄位顯示
-let visibleSet = loadVisibleSet() || new Set(COLUMN_CONFIG.map(c => c.key));
+// let visibleSet = loadVisibleSet() || new Set(COLUMN_CONFIG.map(c => c.key));
+let visibleSet = loadVisibleSet() || new Set(DEFAULT_VISIBLE_KEYS);
 
 /* ==========================================================
    🧩 DOM 快取
