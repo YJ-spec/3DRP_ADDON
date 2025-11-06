@@ -142,8 +142,8 @@ def on_connect(client, userdata, flags, rc):
 # ------------------------------------------------------------
 def generate_mqtt_discovery_config(device_name, device_mac, sensor_type, sensor_name,format_version):
     """ 根據 MQTT 訊息生成 Home Assistant MQTT Discovery 設定 """
-    # 生成 topic
-    topic = f"{device_name}/{device_mac}/data"
+    # 生成 topic (註冊用全小寫)
+    topic = f"{str(device_name).lower()}/{str(device_mac).lower()}/data"
 
     # 基本 config
     config = {
@@ -178,8 +178,8 @@ def generate_mqtt_discovery_config(device_name, device_mac, sensor_type, sensor_
 # ------------------------------------------------------------
 def generate_mqtt_discovery_textconfig(device_name, device_mac, sensor_type, sensor_name,format_version):
     """ 根據 MQTT 訊息生成 Home Assistant MQTT Discovery 設定 """
-    # 生成 topic
-    topic = f"{device_name}/{device_mac}/data"
+    # 生成 topic (註冊用全小寫)
+    topic = f"{str(device_name).lower()}/{str(device_mac).lower()}/data"
 
     # 基本 config
     config = {
@@ -215,10 +215,10 @@ def clear_discovery_for_device(client, device_name, device_mac):
     清掉 HA 裡面這台裝置所有對應的 MQTT Discovery config。
     做法：查 HA 所有 state，找出 sensor.<dev>_<mac>_*，逐一發空的 retain。
     """
-    # dev = str(device_name).lower()
-    # mac = str(device_mac).lower()
-    dev = device_name
-    mac = device_mac
+    dev = str(device_name).lower()
+    mac = str(device_mac).lower()
+    # dev = device_name
+    # mac = device_mac
     prefix = f"sensor.{dev}_{mac}_"
 
     url = f"{BASE_URL}/states"
@@ -292,7 +292,8 @@ def clear_and_rediscover(client, device_name, device_mac, message_json):
         discovery_configs.append(cfg)
 
     for cfg in discovery_configs:
-        discovery_topic = f"homeassistant/sensor/{device_name}_{device_mac}_{cfg['name']}/config"
+        # discovery_topic = f"homeassistant/sensor/{device_name}_{device_mac}_{cfg['name']}/config"
+        discovery_topic = f"homeassistant/sensor/{str(device_name).lower()}_{str(device_mac).lower()}_{cfg['name']}/config"
         payload = json.dumps(cfg, indent=2)
         client.publish(discovery_topic, payload, retain=True)
         logging.info(f"[rediscover] publish {discovery_topic}")
