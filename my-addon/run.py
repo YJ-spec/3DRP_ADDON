@@ -142,7 +142,7 @@ def on_connect(client, userdata, flags, rc):
 def generate_mqtt_discovery_config(device_name, device_mac, sensor_type, sensor_name,format_version):
     """ 根據 MQTT 訊息生成 Home Assistant MQTT Discovery 設定 """
     # 生成 topic (註冊用全小寫)
-    topic = f"{str(device_name).lower()}/{str(device_mac).lower()}/data"
+    topic = f"{str(device_name)}/{str(device_mac)}/data"
 
     # 基本 config
     config = {
@@ -178,7 +178,7 @@ def generate_mqtt_discovery_config(device_name, device_mac, sensor_type, sensor_
 def generate_mqtt_discovery_textconfig(device_name, device_mac, sensor_type, sensor_name,format_version):
     """ 根據 MQTT 訊息生成 Home Assistant MQTT Discovery 設定 """
     # 生成 topic (註冊用全小寫)
-    topic = f"{str(device_name).lower()}/{str(device_mac).lower()}/data"
+    topic = f"{str(device_name)}/{str(device_mac)}/data"
 
     # 基本 config
     config = {
