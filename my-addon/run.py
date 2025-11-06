@@ -74,12 +74,13 @@ unit_conditions = {
 # ------------------------------------------------------------
 DEVICE_VERSION_CACHE = {}
 def is_device_registered(device_name, device_mac, format_version):
-    # 保險起見做成跟 discovery 一樣的命名
+    # device_name ="ComeTrue"
+    # device_mac= "0414"
     dev = str(device_name).lower()
     mac = str(device_mac).lower()
     key = f"{dev}_{mac}"
 
-    entity_id = f"sensor.{dev}_{mac}_formatversion"
+    entity_id = f"sensor.{dev}_{mac}_formatversion"     #訪問HA 小寫正確
     url = f"{BASE_URL}/states/{entity_id}"
 
     try:
@@ -213,6 +214,7 @@ def clear_discovery_for_device(client, device_name, device_mac):
     """
     清掉 HA 裡面這台裝置所有對應的 MQTT Discovery config。
     做法：查 HA 所有 state，找出 sensor.<dev>_<mac>_*，逐一發空的 retain。
+    config 相關全部小寫
     """
     dev = str(device_name).lower()
     mac = str(device_mac).lower()
@@ -292,7 +294,7 @@ def clear_and_rediscover(client, device_name, device_mac, message_json):
 
     for cfg in discovery_configs:
         # discovery_topic = f"homeassistant/sensor/{device_name}_{device_mac}_{cfg['name']}/config"
-        discovery_topic = f"homeassistant/sensor/{str(device_name).lower()}_{str(device_mac).lower()}_{cfg['name']}/config"
+        discovery_topic = f"homeassistant/sensor/{str(device_name).lower()}_{str(device_mac).lower()}_{str(cfg['name']).lower()}/config"
         payload = json.dumps(cfg, indent=2)
         client.publish(discovery_topic, payload, retain=True)
         logging.info(f"[rediscover] publish {discovery_topic}")
@@ -319,8 +321,8 @@ def on_message(client, userdata, msg):
         if len(topic_parts) < 3:
             logging.warning(f"Invalid topic format: {msg.topic}")
             return
-        device_name = topic_parts[0]
-        device_mac = topic_parts[1]
+        device_name = topic_parts[0]    # "ComeTrue"
+        device_mac = topic_parts[1]     # number
         textdata = message_json.get("textdata", {}) or {}
         format_version = textdata.get("FormatVersion")
 
@@ -335,8 +337,8 @@ def on_message(client, userdata, msg):
         if is_device_registered(device_name, device_mac, format_version):
             # logging.info(f"{device_name}/{device_mac} 已註冊（FormatVersion 相同）。")
             return  # 已註冊 → 不重發 Discovery
-
-        # 在 on_message() 裡這樣改：
+ 
+        # # "ComeTrue" # number #"Action"
         threading.Thread(
             target=clear_and_rediscover,
             args=(client, device_name, device_mac, message_json),
