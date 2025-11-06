@@ -95,7 +95,7 @@ def is_device_registered(device_name, device_mac, format_version):
             return False
 
         data = response.json()
-        ha_format_version = data.get("attributes", {}).get("FormatVersion")
+        ha_format_version = data.get("state")  # ← 改這裡
 
         if str(ha_format_version) == str(format_version):
             logging.info(f"{entity_id} 的 FormatVersion 一致 ({format_version}) → 已註冊")
