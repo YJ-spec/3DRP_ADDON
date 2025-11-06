@@ -80,12 +80,12 @@ def is_device_registered(device_name, device_mac, format_version):
     - HA 有且版本相同 → True
     """
     # 保險起見做成跟 discovery 一樣的命名
-    # dev = str(device_name).lower()
-    # mac = str(device_mac).lower()
-    dev = device_name
-    mac = device_mac
+    dev = str(device_name).lower()
+    mac = str(device_mac).lower()
+    # dev = device_name
+    # mac = device_mac
 
-    entity_id = f"sensor.{dev}_{mac}_FormatVersion"
+    entity_id = f"sensor.{dev}_{mac}_formatversion"
     url = f"{BASE_URL}/states/{entity_id}"
 
     try:
