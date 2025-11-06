@@ -72,18 +72,12 @@ unit_conditions = {
 # ------------------------------------------------------------
 # 🧩 檢查裝置是否已註冊
 # ------------------------------------------------------------
+DEVICE_VERSION_CACHE = {}
 def is_device_registered(device_name, device_mac, format_version):
-    """
-    檢查 HA 中的 FormatVersion 是否與設備傳入的相同。
-    - HA 沒這個實體 → False
-    - HA 有但版本不同 → False
-    - HA 有且版本相同 → True
-    """
     # 保險起見做成跟 discovery 一樣的命名
     dev = str(device_name).lower()
     mac = str(device_mac).lower()
-    # dev = device_name
-    # mac = device_mac
+    key = f"{dev}_{mac}"
 
     entity_id = f"sensor.{dev}_{mac}_formatversion"
     url = f"{BASE_URL}/states/{entity_id}"
@@ -92,17 +86,22 @@ def is_device_registered(device_name, device_mac, format_version):
         response = requests.get(url, headers=HEADERS, timeout=5)
         if response.status_code != 200:
             logging.info(f"未找到 {entity_id} → 視為未註冊")
+            DEVICE_VERSION_CACHE[key] = str(format_version)
             return False
 
-        data = response.json()
-        ha_format_version = data.get("attributes", {}).get("hw_version")
-
-        if str(ha_format_version) == str(format_version):
-            logging.info(f"{entity_id} 的 FormatVersion 一致 ({format_version}) → 已註冊")
-            return True
-        else:
-            logging.info(f"{entity_id} 的 FormatVersion 不一致 (HA={ha_format_version}, MQTT={format_version}) → 未註冊")
+        # ③ HA 一致了，再看本地快取
+        cached = DEVICE_VERSION_CACHE.get(key)
+        if cached is not None and str(cached) != str(format_version):
+            logging.info(
+                f"{key} 本地版本不同 (local={cached}, MQTT={format_version}) → 未註冊"
+            )
+            DEVICE_VERSION_CACHE[key] = str(format_version)
             return False
+
+        # ④ 都一樣 → 已註冊
+        DEVICE_VERSION_CACHE[key] = str(format_version)
+        logging.info(f"{entity_id} 的 FormatVersion 一致 ({format_version}) → 已註冊")
+        return True
 
     except Exception as e:
         logging.error(f"查詢 {entity_id} 發生錯誤: {e}")
