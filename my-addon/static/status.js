@@ -21,7 +21,7 @@ const LOWER_DEVICE_NAME = DEVICE_NAME.toLowerCase();
  *   .c-info { color: #3b82f6; font-weight: 500; }   // 藍色：資訊
  *
 */
-const DEFAULT_VISIBLE_KEYS = ["_action", "_dn", "_page","_z1","_model"];
+const DEFAULT_VISIBLE_KEYS = ["_action", "_dn", "_page","_totalpage","_z1","_model"];
 const COLUMN_CONFIG = [
   { key: "_action",    label: "機台當前動作" },
   { key: "_fwversion", label: "固件版本" },
@@ -37,6 +37,7 @@ const COLUMN_CONFIG = [
   { key: "_m",         label: "M墨水量" },
   { key: "_p",         label: "癈粉量" },
   { key: "_page",      label: "當前打印頁" },
+  { key: "_totalpage", label: "總頁數" },
   { key: "_tsrm",      label: "TSRM" },
   { key: "_w",         label: "W膠水量" },
   { key: "_y",         label: "Y墨水量" },
@@ -99,7 +100,7 @@ const COLOR_RULES = {
   //   if (v > 100) return "c-warn";
   //   return "c-ok";
   // }
-  
+
 };
 
 /**
