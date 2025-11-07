@@ -7,11 +7,21 @@
  */
 const DEVICE_NAME   = "ComeTrue";
 const LOWER_DEVICE_NAME = DEVICE_NAME.toLowerCase();
-const DEFAULT_VISIBLE_KEYS = ["_action", "_dn", "_page","_z1","_model"];  // ← 換成你要的欄位 key
 /**
- * ✅ 欄位設定
- * 由上往下依序顯示，屬性與名稱轉換表格
- */
+ * ✅ 欄位設定與樣式說明
+ *
+ * 結構設定：
+ *   DEFAULT_VISIBLE_KEYS  → 預設欄位格式
+ *   COLUMN_CONFIG         → 欄位屬性與名稱對照（由上往下顯示）
+ *   COLOR_RULES           → 狀態著色規則
+ * 顏色樣式：
+ *   .c-ok   { color: #22c55e; font-weight: 500; }   // 綠色：正常
+ *   .c-warn { color: #f59e0b; font-weight: 500; }   // 橘色：警告
+ *   .c-bad  { color: #ef4444; font-weight: 600; }   // 紅色：錯誤
+ *   .c-info { color: #3b82f6; font-weight: 500; }   // 藍色：資訊
+ *
+*/
+const DEFAULT_VISIBLE_KEYS = ["_action", "_dn", "_page","_z1","_model"];
 const COLUMN_CONFIG = [
   { key: "_action",    label: "機台當前動作" },
   { key: "_fwversion", label: "固件版本" },
@@ -37,6 +47,60 @@ const COLUMN_CONFIG = [
   { key: "_swversion", label: "軟體版本" },
   { key: "_model",     label: "機台型號" },
 ];
+
+const COLOR_RULES = {
+  _action: { // 文字比對（全語系）
+    // ✅ 正常狀態
+    // idle: "c-ok",
+    // printing: "c-info",
+
+    // ❌ 異常 / 錯誤狀態（英文）
+    "Fast-axis error!": "c-bad",
+    "Tsr err": "c-bad",
+    "InkJet over voltage!": "c-bad",
+    "The upper lid is opened!": "c-bad",
+    "InkJet CM temperature incorrect!": "c-bad",
+    "InkJet YK temperature incorrect!": "c-bad",
+    "Both InkJet temperature incorrect!": "c-bad",
+    "Slow-axis error!": "c-bad",
+    "Disconnect": "c-bad",
+
+    // ❌ 異常 / 錯誤狀態（繁體中文）
+    "快軸移動錯誤": "c-bad",
+    "噴頭電壓過高": "c-bad",
+    "Upper lid Open": "c-bad",
+    "CM過熱": "c-bad",
+    "YK過熱": "c-bad",
+    "CMYK過熱": "c-bad",
+    "X軸錯誤": "c-bad",
+    "未連線": "c-bad",
+
+    // ❌ 異常 / 錯誤狀態（簡體中文）
+    "快轴移动错误": "c-bad",
+    "喷头电压过高": "c-bad",
+    // "Upper lid Open": "c-bad",
+    "CM过热": "c-bad",
+    "YK过热": "c-bad",
+    "CMYK过热": "c-bad",
+    "X轴错误": "c-bad",
+    "未连线": "c-bad"
+  },
+  // _dn: {
+  //   open: "c-warn",
+  //   closed: "c-ok"
+  // },
+  // _p: [     // 數值範圍
+  //   { min: 0,   max: 50,  class: "c-ok" },
+  //   { min: 51,  max: 80,  class: "c-warn" },
+  //   { min: 81,  max: 9999, class: "c-bad" }
+  // ],
+  // _z1: (v) => {   // 自定義函式
+  //   if (v > 200) return "c-bad";
+  //   if (v > 100) return "c-warn";
+  //   return "c-ok";
+  // }
+  
+};
 
 /**
  * ✅ 自動刷新間隔（毫秒）
@@ -105,6 +169,38 @@ function fmt(v){
 function currentColumns(){
   return COLUMN_CONFIG.filter(col => visibleSet.has(col.key));
 }
+// 目前啟用的欄位（依 COLOR_RULES 配置）
+function getCellClass(colKey, rawValue) {
+  const rule = COLOR_RULES[colKey];
+  if (!rule || rawValue == null) return "";
+
+  const v = String(rawValue).toLowerCase();
+
+  // 1) 物件：文字比對
+  if (typeof rule === "object" && !Array.isArray(rule)) {
+    for (const k in rule) {
+      if (v === k.toLowerCase()) return rule[k];
+    }
+  }
+
+  // 2) 陣列：數值範圍 [{min,max,class}, ...]
+  if (Array.isArray(rule)) {
+    const num = parseFloat(rawValue);
+    if (!isNaN(num)) {
+      for (const r of rule) {
+        if (num >= r.min && num <= r.max) return r.class;
+      }
+    }
+  }
+
+  // 3) 函式：自定義
+  if (typeof rule === "function") {
+    const res = rule(Number(rawValue));
+    if (typeof res === "string") return res;
+  }
+
+  return "";
+}
 
 /* ==========================================================
    🧩 表格渲染
@@ -143,8 +239,10 @@ function renderBody(rows){
       deviceName = deviceName.replace(LOWER_DEVICE_NAME, DEVICE_NAME);
     }
     const cells = [`<td>${fmt(deviceName)}</td>`];
-    for(const col of currentColumns()){
-      cells.push(`<td>${fmt(r[col.key])}</td>`);
+    for (const col of currentColumns()) {
+      const val = fmt(r[col.key]);
+      const cls = getCellClass(col.key, val);
+      cells.push(`<td class="${cls}">${val}</td>`);
     }
     return `<tr>${cells.join("")}</tr>`;
   }).join("");
