@@ -90,9 +90,9 @@ def is_device_registered(device_name, device_mac, format_version):
             DEVICE_VERSION_CACHE[key] = str(format_version)
             return False
 
-        # ③ HA 一致了，再看本地快取
+        # ③ HA 一致了，再看本地快取 [(本地=None) 或 (不一致)] 判定成未註冊
         cached = DEVICE_VERSION_CACHE.get(key)
-        if cached is not None and str(cached) != str(format_version):
+        if cached is None and str(cached) != str(format_version):
             logging.info(
                 f"{key} 本地版本不同 (local={cached}, MQTT={format_version}) → 未註冊"
             )
