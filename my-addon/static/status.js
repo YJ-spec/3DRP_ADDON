@@ -84,7 +84,11 @@ const COLOR_RULES = {
     "YK过热": "c-bad",
     "CMYK过热": "c-bad",
     "X轴错误": "c-bad",
-    "未连线": "c-bad"
+    "未连线": "c-bad",
+
+    // HA 的異常狀態
+    "unavailable": "c-warn",
+    "unknown": "c-warn"
   },
   // _dn: {
   //   open: "c-warn",
@@ -102,7 +106,11 @@ const COLOR_RULES = {
   // }
 
 };
-
+// 放在 COLOR_RULES 下面就好
+const DISPLAY_OVERRIDES = {
+  "unavailable": "軟體離線",
+  "unknown": "數據未更新"
+};
 /**
  * ✅ 自動刷新間隔（毫秒）
  */
@@ -235,21 +243,25 @@ function renderBody(rows){
 
   elBody.innerHTML = rows.map(r=>{
     let deviceName = r.device;
-    // 根據 DEVICE_NAME 自動比對小寫形式
     if (deviceName.includes(LOWER_DEVICE_NAME)) {
       deviceName = deviceName.replace(LOWER_DEVICE_NAME, DEVICE_NAME);
     }
+
     const cells = [`<td>${fmt(deviceName)}</td>`];
+
     for (const col of currentColumns()) {
-      const val = fmt(r[col.key]);
-      const cls = getCellClass(col.key, val);
-      cells.push(`<td class="${cls}">${val}</td>`);
+      const rawVal = fmt(r[col.key]);                     // 原始值 (unavailable)
+      const showVal = DISPLAY_OVERRIDES[rawVal] || rawVal; // 要顯示的文字 (軟體離線)
+      const cls = getCellClass(col.key, rawVal);          // 顏色用原值判斷
+      cells.push(`<td class="${cls}">${showVal}</td>`);
     }
+
     return `<tr>${cells.join("")}</tr>`;
   }).join("");
 
   elCount.textContent = String(rows.length);
 }
+
 
 /* ==========================================================
    🧩 資料請求
